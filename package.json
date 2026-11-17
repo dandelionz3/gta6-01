@@ -1,0 +1,6 @@
+{
+  "name": "solmar-bay",
+  "private": true,
+  "type": "module",
+  "description": "An original offline coastal crime game; no build step or dependencies to install."
+}

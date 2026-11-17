@@ -1,79 +1,53 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
-
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
-
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
+import * as THREE from 'three';
+export function stageShot(game, name) {
+  const presets = {
+    cover: { x: 0, z: 1, angle: Math.PI / 2, speed: 26, wanted: 2, camera: [-25, 14, -3], look: [3, 1.5, -1] },
+    drive: { x: 55, z: 208, angle: -Math.PI / 2, speed: 25, wanted: 0, camera: [77, 10, 192], look: [45, 2, 218] },
+    mission: { x: -128, z: 0, angle: Math.PI / 2, speed: 0, wanted: 1, camera: [-128, 9, 22], look: [-121, 2, 0] },
+    chase: { x: 64, z: 0, angle: 0, speed: 18, wanted: 3, camera: [64, 13, 24], look: [68, 2, -3] }
+  };
+  const s = presets[name] || presets.cover;
+  game.shot = name; game.god = true; game.mode = 'play'; game.health = 87; game.cash = 4250; game.ammo = 64; game.wanted = s.wanted;
+  game.player.x = s.x; game.player.z = s.z; game.player.angle = s.angle;
+  for (const c of game.vehicles.cars) if (Math.hypot(c.x - s.x, c.z - s.z) < 15) {
+    c.x = -192; c.z = -150 + game.rng() * 40;
+  }
+  if (name !== 'mission') {
+    game.car = game.vehicles.spawn('sports', s.x, s.z, s.angle, name === 'chase' ? 0xe6bf68 : 0xed775f, 'player');
+    game.car.speed = s.speed; game.car.stolen = true;
+    if (name === 'chase') {
+      game.car.health = 22;
+      const smokeMaterial = new THREE.MeshBasicMaterial({ color: 0x42494a, transparent: true, opacity: 0.45, depthWrite: false });
+      for (let i = 0; i < 9; i++) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(0.5 + i * 0.13, 7, 6), smokeMaterial);
+        puff.position.set(s.x + Math.sin(i * 2) * i * 0.12, 1.5 + i * 0.45, s.z + 1.5 - i * 0.22);
+        game.scene.add(puff);
+      }
     }
+  } else {
+    game.vehicles.spawn('sports', -128, -10, Math.PI / 2, 0x8f5266, 'parked');
+    game.combat.spawnEnemy(-116, -10);
   }
-  return Infinity;
-}
-
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
+  if (name === 'cover') {
+    game.police.addCruiser(-13, 0, Math.PI / 2); game.police.addCruiser(-22, -5, Math.PI / 2);
+    game.vehicles.spawn('taxi', 18, 4, -Math.PI / 2, 0xe7bc52, 'parked');
   }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
-    }
+  if (name === 'chase') {
+    game.police.addCruiser(64, -12, 0); game.police.addCruiser(76, 0, -Math.PI / 2); game.police.addCruiser(49, -6, Math.PI / 2);
+    game.police.addCop(56, 5); game.police.addCop(72, 8); game.police.addCop(64, 13);
   }
-  return best;
-}
-
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
-  }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
-  }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+  const visibleWalkers = name === 'drive' ? [[43, 220], [63, 220], [75, 221]] : [[s.x + 11, s.z + 8], [s.x - 11, s.z - 4], [s.x + 11, s.z - 9]];
+  visibleWalkers.forEach(([x, z], i) => {
+    const p = game.traffic.pedestrians[i]; p.x = x; p.z = z; p.mesh.position.set(x, 0, z);
+  });
+  const words = name === 'mission' ? 'Deliver the package' : name === 'chase' ? 'Escape the 3-star pursuit' : name === 'drive' ? 'Sunset Strand · enjoy the coast' : 'First Wheels · make it to Solmar Pier';
+  game.missions.stage(words, name === 'mission' ? -121 : 0, name === 'mission' ? 0 : 208);
+  game.camera.position.set(...s.camera); game.camera.lookAt(new THREE.Vector3(...s.look));
+  game.fixedCamera = { position: new THREE.Vector3(...s.camera), look: new THREE.Vector3(...s.look) };
+  if (name === 'chase') for (let i = 0; i < 30; i++) game.vehicles.update(1 / 30, 2);
+  game.vehicles.update(0, 2);
+  // Freeze all vehicle animation after deterministic pre-roll, including smoke.
+  game.vehicles.update = () => {};
+  game.playerMesh.position.set(s.x, 0, s.z); game.playerMesh.rotation.y = s.angle; game.playerMesh.visible = !game.car;
+  game.hud.screen('play');
 }
