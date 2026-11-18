@@ -18,7 +18,7 @@ export function stageShot(game, name) {
     if (name === 'chase') {
       game.car.health = 22;
       const smokeMaterial = new THREE.MeshBasicMaterial({ color: 0x42494a, transparent: true, opacity: 0.45, depthWrite: false });
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < 10; i++) {
         const puff = new THREE.Mesh(new THREE.SphereGeometry(0.5 + i * 0.13, 7, 6), smokeMaterial);
         puff.position.set(s.x + Math.sin(i * 2) * i * 0.12, 1.5 + i * 0.45, s.z + 1.5 - i * 0.22);
         game.scene.add(puff);

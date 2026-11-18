@@ -1,6 +1,6 @@
 export const CITY = { extent: 260, spacing: 64, road: 18, beach: 218 };
 export const COLORS = { asphalt: 0x343e4b, sand: 0xe9c596, ocean: 0x258e9e, neon: 0x7fffd4 };
-export const RULES = { walk: 7, sprint: 12, acceleration: 19, maxSpeed: 42, reverse: 12, policeSight: 85, forget: 14 };
+export const RULES = { walk: 7, sprint: 13, acceleration: 19, maxSpeed: 42, reverse: 12, policeSight: 85, forget: 14 };
 export const MISSIONS = [
   { name: 'First Wheels', intro: 'Mara: Welcome home, Rook. Borrow some wheels. Meet me at the pier.', reward: 450, target: [0, 208] },
   { name: 'The Package', intro: 'Mara: A sealed case. No questions. Collect it downtown, then bring it to the beach.', reward: 800, target: [-128, 0] },

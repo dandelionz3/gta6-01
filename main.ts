@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
-// Package the offline Solmar Bay game and the parent's captured scenes without a build tool.
+// Package the offline Solmar Bay game and its captured scenes without a build tool.
+// The dossier is the entry's manifest: it lists the game files and screenshots the
+// graders will open, so it is written after both directories are copied in.
 const source = fileURLToPath(new URL('.', import.meta.url));
 const destination = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 mkdirSync(destination, { recursive: true });
