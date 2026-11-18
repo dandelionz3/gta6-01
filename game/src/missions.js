@@ -1,203 +1,195 @@
-// Five-mission story chain for Solmar Bay. Each mission is a small step
-// machine: go somewhere, steal something, survive something. The manager owns
-// the 3D beacon and talks to the game through callbacks so it never imports
-// the player, the police or the combat system directly.
+// Five-mission story chain for Solmar Bay. Each mission is a small state
+// machine driven by the live game state the main loop hands in every
+// frame; the beacon, the banner and the cash reward all flow through the
+// hooks the main loop supplies, so this module never touches the HUD or
+// the police directly.
 import * as THREE from 'three';
-import { CFG } from './config.js';
+import { MISSIONS } from './config.js';
 
-function makeBeacon() {
+function makeBeaconMesh() {
   const g = new THREE.Group();
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(3.2, 0.22, 10, 32),
-    new THREE.MeshBasicMaterial({ color: 0xffd94a }),
-  );
-  ring.rotation.x = Math.PI / 2;
-  ring.position.y = 0.25;
   const beam = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.1, 1.6, 26, 12, 1, true),
+    new THREE.CylinderGeometry(2.2, 2.2, 26, 18, 1, true),
     new THREE.MeshBasicMaterial({
-      color: 0xffd94a, transparent: true, opacity: 0.28,
-      side: THREE.DoubleSide, depthWrite: false,
+      color: 0xffd24a,
+      transparent: true,
+      opacity: 0.32,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     }),
   );
   beam.position.y = 13;
-  const pin = new THREE.Mesh(
-    new THREE.ConeGeometry(0.9, 2.4, 10),
-    new THREE.MeshBasicMaterial({ color: 0xff5a3a }),
+  g.add(beam);
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.6, 2.6, 28),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd24a,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide,
+    }),
   );
-  pin.position.y = 7;
-  pin.rotation.x = Math.PI;
-  g.add(ring, beam, pin);
-  g.userData = { ring, beam, pin };
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.15;
+  g.add(ring);
+  g.userData.beam = beam;
+  g.userData.ring = ring;
+  g.visible = false;
   return g;
 }
 
-export class MissionManager {
-  constructor(scene, hud, cb) {
+export class Missions {
+  constructor(scene, world, hooks) {
     this.scene = scene;
-    this.hud = hud;
-    this.cb = cb; // { onCash, onToast, onSpawnGang, onSpawnVan, onSetWanted,
-    //            onProgress, onMissionComplete, onMissionFailed }
-    this.index = 0; // next mission to play (0-based)
-    this.active = false;
+    this.world = world;
+    this.hooks = hooks; // {addCash, banner, toast, setObjective, setWanted, spawnGang, spawnVan}
+    this.index = 0;     // 0-based: which mission is current
+    this.phase = 'idle'; // idle | active | done
     this.step = 0;
-    this.beacon = null;
+    this.beacon = makeBeaconMesh();
+    scene.add(this.beacon);
     this.beaconPos = null;
-    this.timer = 0;
-    this.hasPackage = false;
-    this.van = null;
-    this.time = 0;
+    this._pulse = 0;
+    this._van = null;
   }
 
   get current() {
-    return CFG.missions[this.index] || null;
-  }
-  get done() {
-    return this.index >= CFG.missions.length;
+    return MISSIONS[this.index] || null;
   }
 
-  missionName() {
-    const m = this.current;
-    return m ? `${m.id}. ${m.title}` : 'All missions complete';
+  get allDone() {
+    return this.index >= MISSIONS.length;
+  }
+
+  // Place the beacon and show the objective text.
+  setBeacon(pos, objective) {
+    this.beaconPos = pos;
+    this.beacon.position.set(pos.x, 0, pos.z);
+    this.beacon.visible = true;
+    if (this.hooks.setObjective) this.hooks.setObjective(objective);
+  }
+
+  hideBeacon() {
+    this.beacon.visible = false;
+    this.beaconPos = null;
   }
 
   start(i) {
-    const m = CFG.missions[i];
-    if (!m) return false;
-    this.index = i;
-    this.active = true;
+    if (this.allDone) return;
+    this.index = Math.max(0, Math.min(i, MISSIONS.length - 1));
+    this.phase = 'active';
     this.step = 0;
-    this.hasPackage = false;
-    this.van = null;
-    this.timer = 0;
-    this.cb.onToast(`Mission ${m.id} — ${m.title}`);
-    this.hud.setObjective(m.objective);
-    this.advanceToStep();
-    return true;
-  }
-
-  startCurrent() {
-    if (this.done) {
-      this.cb.onToast('Story complete — free roam, Rook.');
-      return false;
-    }
-    return this.start(this.index);
-  }
-
-  clearBeacon() {
-    if (this.beacon) {
-      this.scene.remove(this.beacon);
-      this.beacon = null;
-      this.beaconPos = null;
-    }
-  }
-
-  placeBeacon(x, z) {
-    this.clearBeacon();
-    this.beacon = makeBeacon();
-    this.beacon.position.set(x, 0, z);
-    this.scene.add(this.beacon);
-    this.beaconPos = { x, z };
-  }
-
-  advanceToStep() {
     const m = this.current;
-    if (!m) return;
-    const s = m.steps[this.step];
-    if (!s) { this.complete(); return; }
-    this.hud.setObjective(s.text);
-    if (s.kind === 'goto' || s.kind === 'deliver' || s.kind === 'escape') {
-      this.placeBeacon(s.pos[0], s.pos[1]);
-    } else if (s.kind === 'heat') {
-      this.cb.onSetWanted(s.stars);
-      this.clearBeacon();
-    } else if (s.kind === 'survive') {
-      this.clearBeacon();
-      this.cb.onSpawnGang(s.count, this.beaconPos || { x: -92, z: -46 });
-      this.timer = 0;
-    } else if (s.kind === 'steal' || s.kind === 'clear') {
-      this.clearBeacon();
+    const s = this.world.spots;
+    if (this.hooks.banner) this.hooks.banner(m.name, m.briefing);
+    if (m.id === 1) {
+      this.setBeacon(s.plaza, m.objective);
+    } else if (m.id === 2) {
+      this.setBeacon(s.pierPickup, 'Pick up the package at the pier');
+    } else if (m.id === 3) {
+      this.hooks.setWanted(2);
+      this.hideBeacon();
+      if (this.hooks.setObjective) this.hooks.setObjective(m.objective);
+    } else if (m.id === 4) {
+      this.setBeacon(s.carPark, 'Meet the contact at the parking lot');
+    } else if (m.id === 5) {
+      this._van = this.hooks.spawnVan ? this.hooks.spawnVan(s.vanSpot) : null;
+      this.setBeacon(s.vanSpot, 'Steal the armoured van');
     }
   }
 
-  nextStep() {
-    this.step += 1;
-    const m = this.current;
-    if (!m) return;
-    if (this.step >= m.steps.length) this.complete();
-    else this.advanceToStep();
+  restart() {
+    if (this.allDone) return;
+    this.start(this.index);
+  }
+
+  fail() {
+    if (this.phase !== 'active') return;
+    this.phase = 'idle';
+    this.hideBeacon();
+    if (this.hooks.banner) this.hooks.banner('Mission failed', 'Press M and try it again.');
+    if (this.hooks.setObjective) this.hooks.setObjective('Press M to retry the mission');
   }
 
   complete() {
     const m = this.current;
-    this.active = false;
-    this.clearBeacon();
-    this.cb.onCash(m.reward);
-    this.cb.onToast(`Mission complete — +$${m.reward}`);
-    this.hud.setObjective('Mission complete. Press M for the next job.');
-    this.index += 1;
-    this.cb.onMissionComplete(m.id);
-    this.cb.onProgress();
-  }
-
-  fail(reason) {
-    const m = this.current;
-    this.active = false;
-    this.clearBeacon();
-    this.hasPackage = false;
-    this.cb.onToast(`Mission failed — ${reason}`);
-    this.hud.setObjective('Mission failed. Press M to retry.');
-    if (this.cb.onMissionFailed) this.cb.onMissionFailed(m ? m.id : 0, reason);
-  }
-
-  update(dt, player, combat) {
-    this.time += dt;
-    if (this.beacon) {
-      const t = this.time;
-      this.beacon.userData.ring.scale.setScalar(1 + Math.sin(t * 3) * 0.08);
-      this.beacon.userData.pin.position.y = 7 + Math.sin(t * 2.2) * 0.7;
-      this.beacon.userData.beam.material.opacity = 0.22 + Math.sin(t * 2.2) * 0.08;
-      this.beacon.rotation.y += dt * 0.6;
-    }
-    if (!this.active) return;
-    const m = this.current;
     if (!m) return;
-    const s = m.steps[this.step];
-    if (!s) return;
-    const px = player.pos.x;
-    const pz = player.pos.z;
-
-    if (s.kind === 'steal') {
-      if (player.car) this.nextStep();
-    } else if (s.kind === 'goto') {
-      if (Math.hypot(px - s.pos[0], pz - s.pos[1]) < 7) {
-        if (m.id === 2 && this.step === 0) {
-          this.hasPackage = true;
-          this.cb.onSetWanted(1);
-          this.cb.onToast('Package picked up — cops noticed!');
-        }
-        if (m.id === 4 && this.step === 0) {
-          this.cb.onToast('It is a setup — ambush!');
-        }
-        if (m.id === 5 && this.step === 0) {
-          this.van = this.cb.onSpawnVan(s.pos[0], s.pos[1]);
-          this.cb.onSetWanted(3);
-          this.cb.onToast('Grab the van — 3 stars!');
-        }
-        this.nextStep();
-      }
-    } else if (s.kind === 'deliver') {
-      if (this.hasPackage && Math.hypot(px - s.pos[0], pz - s.pos[1]) < 7) this.nextStep();
-    } else if (s.kind === 'heat') {
-      this.nextStep();
-    } else if (s.kind === 'clear') {
-      if (this.cb.wantedLevel() === 0) this.nextStep();
-    } else if (s.kind === 'survive') {
-      this.timer += dt;
-      if (combat.enemiesAlive() === 0 && this.timer > 1.5) this.nextStep();
-    } else if (s.kind === 'escape') {
-      const inVan = player.car && this.van && player.car === this.van;
-      if (inVan && Math.hypot(px - s.pos[0], pz - s.pos[1]) < 9) this.nextStep();
+    this.phase = 'idle';
+    this.hideBeacon();
+    if (this.hooks.addCash) this.hooks.addCash(m.reward);
+    if (this.hooks.banner) this.hooks.banner('Mission complete', `+ $${m.reward} — ${m.name}`);
+    if (this.hooks.toast) this.hooks.toast(`Banked $${m.reward}`);
+    this.index += 1;
+    this.step = 0;
+    if (this.allDone) {
+      this.phase = 'done';
+      if (this.hooks.setObjective) this.hooks.setObjective('Story complete — free roam Solmar Bay');
+      if (this.hooks.banner) this.hooks.banner('The Big Score done', 'Rook owns this city now. Free roam!');
+    } else if (this.hooks.setObjective) {
+      this.hooks.setObjective(`Next: ${MISSIONS[this.index].name} — press M to start`);
     }
+  }
+
+  // s: {playerPos, inCar, car, wanted, gangAlive}
+  update(dt, s) {
+    this._pulse += dt;
+    if (this.beacon.visible) {
+      this.beacon.userData.beam.material.opacity = 0.26 + Math.sin(this._pulse * 3) * 0.1;
+      const sc = 1 + Math.sin(this._pulse * 3) * 0.12;
+      this.beacon.userData.ring.scale.set(sc, sc, 1);
+      this.beacon.rotation.y += dt * 0.8;
+    }
+    if (this.phase !== 'active' || !s) return;
+    const m = this.current;
+    const sp = this.world.spots;
+    const near = (pos, r) => Math.hypot(s.playerPos.x - pos.x, s.playerPos.z - pos.z) < r;
+
+    if (m.id === 1) {
+      if (this.step === 0 && s.inCar) {
+        this.step = 1;
+        if (this.hooks.toast) this.hooks.toast('Wheels secured — get to the marker');
+      } else if (this.step === 1 && s.inCar && near(sp.plaza, 9)) {
+        this.complete();
+      }
+    } else if (m.id === 2) {
+      if (this.step === 0 && near(sp.pierPickup, 4)) {
+        this.step = 1;
+        this.hooks.setWanted(1);
+        this.setBeacon(sp.delivery, 'Deliver the package');
+        if (this.hooks.toast) this.hooks.toast('Package grabbed — cops are watching, move!');
+      } else if (this.step === 1 && near(sp.delivery, 7)) {
+        this.complete();
+      }
+    } else if (m.id === 3) {
+      if (!s.wanted) this.complete();
+    } else if (m.id === 4) {
+      if (this.step === 0 && near(sp.carPark, 9)) {
+        this.step = 1;
+        this.hideBeacon();
+        if (this.hooks.spawnGang) this.hooks.spawnGang(sp.carPark, 4);
+        if (this.hooks.banner) this.hooks.banner('Ambush!', 'Rival gang — take them all out');
+        if (this.hooks.setObjective) this.hooks.setObjective('Survive the ambush — take out the rivals');
+      } else if (this.step === 1 && s.gangAlive === 0) {
+        this.complete();
+      }
+    } else if (m.id === 5) {
+      if (this.step === 0 && s.inCar && s.car && s.car.armoured) {
+        this.step = 1;
+        this.hooks.setWanted(3);
+        this.hideBeacon();
+        if (this.hooks.toast) this.hooks.toast('Van taken — lose the 3-star tail!');
+        if (this.hooks.setObjective) this.hooks.setObjective('Escape the 3-star wanted level in the van');
+      } else if (this.step === 1 && s.inCar && s.car && s.car.armoured && !s.wanted) {
+        this.complete();
+      }
+    }
+  }
+
+  // Current beacon position for the minimap, or null.
+  blip() {
+    return this.beacon.visible && this.beaconPos
+      ? { x: this.beaconPos.x, z: this.beaconPos.z }
+      : null;
   }
 }

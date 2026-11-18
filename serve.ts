@@ -1,50 +1,53 @@
-// Solmar Bay — tiny static server. Serves game/ at /, screenshots/ at
-// /screenshots and shots.json at /shots.json. Node 22, standard library only.
-// Run: node serve.ts — then open http://localhost:8080
+// Solmar Bay — plain static file server for local play. Serves game/ at
+// the root (so / loads game/index.html) and screenshots/ under /screenshots/.
+// No dependencies, no build step: `node serve.ts`, then open
+// http://localhost:8080
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { dirname, extname, join, normalize, sep } from 'node:path';
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = 8080;
+const gameRoot = join(here, 'game');
+const shotsRoot = join(here, 'screenshots');
+const port = Number(process.env.PORT || 8080);
 
-const MIME: Record<string, string> = {
+const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
 };
 
-const server = createServer(async (req, res) => {
-  try {
-    const url = new URL(req.url || '/', `http://localhost:${PORT}`);
-    let path = decodeURIComponent(url.pathname);
-    if (path === '/') path = '/index.html';
-    let file: string;
-    if (path.startsWith('/screenshots/')) file = join(here, path);
-    else if (path === '/shots.json') file = join(here, 'shots.json');
-    else file = join(here, 'game', path);
-    const safe = normalize(file);
-    if (!safe.startsWith(here + sep)) {
-      res.writeHead(403);
-      res.end('forbidden');
-      return;
-    }
-    const data = await readFile(safe);
-    res.writeHead(200, { 'content-type': MIME[extname(safe)] || 'application/octet-stream' });
-    res.end(data);
-  } catch {
+const server = createServer((req, res) => {
+  const url = decodeURIComponent((req.url || '/').split('?')[0]);
+  let file;
+  if (url === '/') {
+    file = join(gameRoot, 'index.html');
+  } else if (url.startsWith('/screenshots/')) {
+    file = join(shotsRoot, url.slice('/screenshots/'.length));
+  } else {
+    file = join(gameRoot, url);
+  }
+  if (!file.startsWith(gameRoot) && !file.startsWith(shotsRoot)) {
+    res.writeHead(403);
+    res.end('forbidden');
+    return;
+  }
+  if (!existsSync(file) || !statSync(file).isFile()) {
     res.writeHead(404);
     res.end('not found');
+    return;
   }
+  res.writeHead(200, { 'content-type': types[extname(file).toLowerCase()] || 'application/octet-stream' });
+  createReadStream(file).pipe(res);
 });
 
-server.listen(PORT, () => {
-  console.log(`Solmar Bay running at http://localhost:${PORT}`);
+server.listen(port, () => {
+  console.log(`Solmar Bay serving at http://localhost:${port}`);
 });

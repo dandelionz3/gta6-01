@@ -1,6 +1,8 @@
-// Seeded randomness for Solmar Bay. Gameplay never touches Math.random or
-// Date.now — the same seed always builds the same city, so staged scenes and
-// replays stay deterministic.
+// Seeded randomness for Solmar Bay. Gameplay never touches Math.random
+// or Date.now — the same seed always builds the same city, so the staged
+// screenshot scenes are reproducible shot after shot.
+
+// mulberry32: tiny, fast, good-enough PRNG with a 32-bit state.
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return function next() {
@@ -12,32 +14,46 @@ export function mulberry32(seed) {
   };
 }
 
+// Small convenience wrapper so call sites read like plain English.
 export class Rng {
-  constructor(seed = 1) {
-    this.next = mulberry32(seed);
+  constructor(seed = 1337) {
+    this.nextFn = mulberry32(seed);
     this.seed = seed >>> 0;
   }
-  // float in [0, 1)
-  f() {
-    return this.next();
+
+  // Float in [0, 1).
+  next() {
+    return this.nextFn();
   }
-  // float in [a, b)
-  range(a, b) {
-    return a + (b - a) * this.next();
+
+  // Float in [min, max).
+  range(min, max) {
+    return min + this.next() * (max - min);
   }
-  // integer in [a, b]
-  int(a, b) {
-    return a + Math.floor(this.next() * (b - a + 1));
+
+  // Integer in [min, max] inclusive.
+  int(min, max) {
+    return Math.floor(this.range(min, max + 1));
   }
-  // true with probability p
+
+  // True with probability p (0..1).
   chance(p) {
     return this.next() < p;
   }
-  pick(arr) {
-    return arr[Math.floor(this.next() * arr.length)];
+
+  // One element from a non-empty array.
+  pick(list) {
+    return list[Math.floor(this.next() * list.length)];
   }
-  // pick one of two values
-  either(a, b) {
-    return this.next() < 0.5 ? a : b;
+
+  // A fresh Rng forked off this one (handy for subsystems).
+  fork(salt = 1) {
+    return new Rng((this.seed ^ Math.imul(salt, 2654435761)) >>> 0);
   }
+}
+
+// Deterministic pick of an element by index — used by traffic routes so
+// a route never depends on call order.
+export function pickAt(list, u) {
+  return list[Math.floor(u * list.length) % list.length];
 }

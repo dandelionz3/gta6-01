@@ -1,108 +1,103 @@
-// Staged deterministic screenshot scenes (?shot=<name>&seed=1). Each scene
-// freezes the AI, places the player/camera at fixed spots, forces the HUD on
-// and turns on god mode so nothing dies mid-shot.
+// Staged screenshot scenes for Solmar Bay. Each scene is deterministic
+// (seed 1 world), places the player, cars, cops and camera by hand, and
+// turns on god mode so nothing can die mid-shot. The main loop freezes
+// traffic and police while a shot is staged, so the composition the
+// camera sees is exactly the one written here.
 import * as THREE from 'three';
-import { Rng } from './random.js';
-import { spawnCar } from './vehicles.js';
+import { SHOTS } from './config.js';
 
-function putPlayerInCar(G, kind, x, z, heading, colour, health = 100) {
-  const car = spawnCar(G.scene, kind, x, z, heading, colour);
-  car.health = health;
-  G.player.car = car;
-  G.player.pos.set(x, 0, z);
-  G.player.heading = heading;
-  G.parked = G.parked.filter((c) => c !== car);
+// Park a traffic car at a fixed spot with a fixed heading.
+function parkTraffic(game, i, x, z, heading) {
+  const car = game.traffic.drivers[i % game.traffic.drivers.length];
+  car.group.position.set(x, 0, z);
+  car.heading = heading;
+  car.group.rotation.y = heading;
+  car.speed = 0;
   return car;
 }
 
-function addChaser(G, x, z, heading) {
-  const car = spawnCar(G.scene, 'police', x, z, heading, 0x1d2f4a);
-  car.ai = { speed: 26 };
-  G.police.cruisers.push(car);
-  return car;
+function placePed(game, i, x, z) {
+  const ped = game.traffic.peds[i % game.traffic.peds.length];
+  ped.group.position.set(x, 0, z);
+  ped.state = 'walk';
+  ped.target = { x, z };
+  return ped;
 }
 
-function addCop(G, x, z) {
-  // foot cops are spawned through the Police class so their update stays sane
-  G.police.spawnCopAt(x, z);
-}
-
-export function applyShot(name, G) {
-  const rng = new Rng(1);
-  G.state.god = true;
-  G.state.shotMode = true;
-  G.hud.showHud(true);
-  G.hud.showScreen(null);
-  G.hud.setHintVisible(false);
-  G.audio.ensure();
-
-  const lookAt = (x, y, z) => {
-    G.state.shotCam = {
-      pos: new THREE.Vector3(x, y, z),
-      look: new THREE.Vector3(G.player.pos.x, 1.6, G.player.pos.z),
-    };
-  };
+export function applyShot(name, game) {
+  if (!SHOTS.includes(name)) return false;
+  game.setGodMode(true);
+  game.hud.showScreen(null);
 
   if (name === 'cover') {
-    // downtown intersection at sunset, stolen sports car, two cruisers on it
-    // (cruisers trail from the south so the camera sees them past the player)
-    putPlayerInCar(G, 'sports', 0, 8, Math.PI, 0xc23b2e);
-    G.player.car.speed = 12;
-    G.police.setWanted(2);
-    addChaser(G, -5, 26, Math.PI);
-    addChaser(G, 6, 34, Math.PI);
-    // a little street life around the intersection
-    G.traffic.spawnPed(10, 2);
-    G.traffic.spawnPed(-12, 14);
-    G.traffic.spawnPed(14, -6);
-    G.hud.setObjective('Mission 1 — First Wheels: drive to the marker');
-    G.missions.placeBeacon(92, 46);
-    lookAt(10, 6, -14);
+    // Downtown intersection at sunset: player in a stolen red sports car,
+    // two cruisers closing in behind, traffic and pedestrians around.
+    // Camera sits mid-avenue so the whole chase formation stays in frame
+    // and no building wall crowds the lens.
+    game.placePlayerCar('sports', 0xc22a2a, 2, -70, 0, 100);
+    game.spawnPoliceCruiser(-2, -84, 0);
+    game.spawnPoliceCruiser(4, -80, -0.15);
+    parkTraffic(game, 0, 52, -52.6, -Math.PI / 2);
+    parkTraffic(game, 1, -60, -57.4, Math.PI / 2);
+    parkTraffic(game, 2, 6, -20, Math.PI);
+    placePed(game, 0, 8, -48);
+    placePed(game, 1, -8, -62);
+    placePed(game, 2, 12, -52);
+    placePed(game, 3, -6, -44);
+    game.setWanted(2);
+    game.setObjective('Free roam — press M for missions');
+    game.setFixedCamera(0, 5, -92, 0, 1.5, -58);
   } else if (name === 'drive') {
-    // beach boulevard cruise on the southernmost road, palms + ocean behind
-    putPlayerInCar(G, 'sports', -40, 184, Math.PI / 2, 0x2e6fc2);
-    G.player.car.speed = 26;
-    G.police.setWanted(0);
-    G.hud.setObjective('Free roam — cruise the boulevard');
-    // camera on the road axis west of the car: no building can block the shot
-    lookAt(-64, 4.2, 184);
+    // Beach boulevard cruise: palms and ocean behind, speed 80+.
+    const car = game.placePlayerCar('sports', 0x2a5ac2, -40, 167.4, Math.PI / 2, 100);
+    car.speed = 24;
+    parkTraffic(game, 0, 12, 162.6, Math.PI / 2);
+    parkTraffic(game, 1, -90, 167.4, Math.PI / 2);
+    placePed(game, 0, 30, 174);
+    placePed(game, 1, -12, 174);
+    game.setWanted(0);
+    game.setObjective('Free roam — press M for missions');
+    // Closer and lower than the first pass: the car fills the frame and
+    // the beach building no longer eats the left half of the shot.
+    game.setFixedCamera(-56, 4, 155, -28, 1.2, 168);
   } else if (name === 'mission') {
-    // on foot at the mission beacon, package job, rival car nearby
-    G.player.pos.set(-46, 0, 86);
-    G.player.heading = Math.PI;
-    G.player.car = null;
-    G.missions.start(1);
-    G.hud.setObjective('Deliver the package');
-    spawnCar(G.scene, 'sedan', -38, 98, Math.PI * 0.75, 0x8a1f2a);
-    G.traffic.spawnPed(-52, 96);
-    G.traffic.spawnPed(-40, 82);
-    lookAt(-38, 4.6, 74);
+    // On foot at the delivery beacon, banner up, rival car nearby.
+    game.teleportPlayer(-110, 104, 0);
+    game.missions.hideBeacon();
+    game.missions.setBeacon({ x: -110, z: 110 }, 'Deliver the package');
+    game.banner('The Package', 'Deliver the package');
+    const rival = game.spawnParkedCar('sedan', 0x222222, -102, 116, 2.6);
+    void rival;
+    placePed(game, 0, -104, 100);
+    placePed(game, 1, -116, 118);
+    game.setWanted(1);
+    // Stepped in closer so Rook reads clearly next to the beacon.
+    game.setFixedCamera(-100, 5.5, 98, -109, 1.2, 108);
   } else if (name === 'chase') {
-    // wanted 3, smoking car, cruisers + foot cops closing in, downtown.
-    // Camera sits on the road axis east of the player so no streetlight pole
-    // blocks the frame; cruisers trail from the east, one blocks from the west.
-    const car = putPlayerInCar(G, 'sedan', 0, -46, -Math.PI / 2, 0xd8d8d8, 24);
-    car.speed = 14;
-    G.police.setWanted(3);
-    addChaser(G, 12, -49, -Math.PI / 2);
-    addChaser(G, 18, -43, -Math.PI / 2);
-    addChaser(G, -16, -46, Math.PI / 2);
-    addCop(G, 6, -40);
-    addCop(G, -4, -52);
-    G.hud.setObjective('WANTED — lose the cops!');
-    lookAt(30, 6.5, -46);
-  } else {
-    // unknown shot name: fall back to a plain downtown drive
-    putPlayerInCar(G, 'sedan', 0, 0, 0, 0xc23b2e);
-    lookAt(8, 5, -12);
+    // Wanted 3 downtown: smoking player car, cruisers and foot cops
+    // closing in. Both cruisers sit ahead of the camera this time, and
+    // the smoke is placed by hand — the staged scene freezes the car,
+    // so its driving smoke never spawns on its own.
+    const playerCar = game.placePlayerCar('sports', 0xd8c22a, 55, -40, 0, 25);
+    game.spawnPoliceCruiser(50, -30, Math.PI);
+    game.spawnPoliceCruiser(62, -44, 0.3);
+    game.spawnFootCop(58, -30);
+    game.spawnFootCop(50, -33);
+    parkTraffic(game, 0, 60, -20, Math.PI);
+    placePed(game, 0, 62, -48);
+    for (let i = 0; i < 3; i++) {
+      const puff = new THREE.Mesh(
+        new THREE.SphereGeometry(0.6 + i * 0.35, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0x999999, transparent: true, opacity: 0.5 - i * 0.1 }),
+      );
+      puff.position.set(playerCar.pos.x + 0.4 - i * 0.3, 1.5 + i * 0.7, playerCar.pos.z + 1.8 - i * 0.4);
+      game.scene.add(puff);
+    }
+    game.setWanted(3);
+    game.setObjective('Lose the 3-star wanted level!');
+    // Camera shifted west so the streetlight lamp at the intersection
+    // stops filling the top-left corner.
+    game.setFixedCamera(52, 6, -54, 55, 1.5, -36);
   }
-
-  // HUD numbers for the frame
-  G.hud.setHealth(G.state.health);
-  G.hud.setCash(G.state.cash);
-  G.hud.setWanted(G.police.stars);
-  G.hud.setAmmo(G.combat.ammo);
-  G.hud.setSpeed(G.player.car ? Math.abs(G.player.car.speed) * 3.6 : 0);
-  G.hud.setCrosshair(false);
-  void rng;
+  return true;
 }
