@@ -1,56 +1,45 @@
-// Solmar Bay — tiny static file server (Node 22, standard library only).
-// Serves game/ at / and screenshots/ at /screenshots so the game runs
-// from plain static files with no build step: `node serve.ts`.
+// Minimal static file server for local playtesting of Solmar Bay.
+// Serves the game/ directory at http://localhost:8080 (or $PORT).
+
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, join, extname, normalize } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const port = parseInt(process.env.PORT || "8080", 10);
+const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(here, "game");
+const port = Number(process.env.PORT || 8080);
 
-const MIME = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".mjs": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
+const TYPES = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".json": "application/json",
+  ".css": "text/css",
   ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
   ".png": "image/png",
-  ".svg": "image/svg+xml",
 };
 
 const server = createServer(async (req, res) => {
   try {
-    const url = new URL(req.url || "/", "http://localhost");
+    const url = new URL(req.url, "http://localhost");
     let rel = decodeURIComponent(url.pathname);
-    if (rel === "/favicon.ico") { // no favicon file by design — answer quietly
-      res.writeHead(204);
-      res.end();
-      return;
-    }
     if (rel === "/") rel = "/index.html";
-    // screenshots live beside game/, game files live under game/
-    const candidates = rel.startsWith("/screenshots/")
-      ? [join(here, normalize(rel))]
-      : [join(here, "game", normalize(rel))];
-    const file = candidates[0];
-    if (!file.startsWith(here) || !existsSync(file)) {
-      res.writeHead(404, { "content-type": "text/plain" });
-      res.end("not found");
+    const file = path.join(root, rel);
+    if (!file.startsWith(root)) {
+      res.writeHead(403);
+      res.end("forbidden");
       return;
     }
-    const body = await readFile(file);
-    res.writeHead(200, { "content-type": MIME[extname(file)] || "application/octet-stream" });
-    res.end(body);
-  } catch (err) {
-    res.writeHead(500, { "content-type": "text/plain" });
-    res.end("server error");
+    const data = await readFile(file);
+    res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream" });
+    res.end(data);
+  } catch {
+    res.writeHead(404);
+    res.end("not found");
   }
 });
 
 server.listen(port, () => {
-  console.log(`Solmar Bay running at http://localhost:${port}/`);
+  console.log(`Solmar Bay serving at http://localhost:${port}`);
 });

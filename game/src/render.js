@@ -1,55 +1,79 @@
-// Renderer, sky, lights and camera rig. Keeps all three.js boilerplate in
-// one place; the game loop only asks for the scene, camera and a resize.
-import * as THREE from "three";
-import { CFG } from "./config.js";
+// Three.js renderer + scene + late-afternoon lighting + sky + fog.
 
-export function createStage(canvas) {
+import * as THREE from "three";
+import { COLORS } from "./config.js";
+
+export function createRender(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(CFG.palette.fog, 90, 420);
+  scene.fog = new THREE.Fog(COLORS.fog, 120, 520);
 
-  // Sunset sky dome: vertical gradient baked into a shader sphere.
+  // Vertical gradient sky on a big backside sphere.
+  const skyGeo = new THREE.SphereGeometry(800, 24, 16);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     uniforms: {
-      top: { value: new THREE.Color(CFG.palette.skyTop) },
-      bottom: { value: new THREE.Color(CFG.palette.skyBottom) },
+      top: { value: new THREE.Color(COLORS.skyTop) },
+      bottom: { value: new THREE.Color(COLORS.skyBottom) },
     },
-    vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-    fragmentShader: `varying vec3 vP; uniform vec3 top; uniform vec3 bottom;
-      void main(){ float h = normalize(vP).y * 0.5 + 0.5; gl_FragColor = vec4(mix(bottom, top, pow(h, 0.8)), 1.0); }`,
+    vertexShader: `
+      varying vec3 vPos;
+      void main() {
+        vPos = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 top;
+      uniform vec3 bottom;
+      varying vec3 vPos;
+      void main() {
+        float h = clamp(normalize(vPos).y * 0.5 + 0.5, 0.0, 1.0);
+        gl_FragColor = vec4(mix(bottom, top, pow(h, 0.8)), 1.0);
+      }`,
   });
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 24, 16), skyMat);
+  const sky = new THREE.Mesh(skyGeo, skyMat);
   scene.add(sky);
 
-  // Low late-afternoon sun + warm ambient fill.
-  const sun = new THREE.DirectionalLight(CFG.palette.sun, 2.4);
-  sun.position.set(-90, 70, 60);
+  // Low warm sun + soft sky fill.
+  const sun = new THREE.DirectionalLight(COLORS.sun, 2.4);
+  sun.position.set(-140, 110, 180);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -180; sun.shadow.camera.right = 180;
-  sun.shadow.camera.top = 180; sun.shadow.camera.bottom = -180;
-  sun.shadow.camera.far = 500;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -240;
+  sun.shadow.camera.right = 240;
+  sun.shadow.camera.top = 240;
+  sun.shadow.camera.bottom = -240;
+  sun.shadow.camera.far = 700;
   scene.add(sun);
-  const hemi = new THREE.HemisphereLight(0x8aa0c8, 0x6a4a30, 0.9);
-  scene.add(hemi);
+  scene.add(new THREE.HemisphereLight(0x8fb4d8, 0x8a6a4a, 0.9));
 
-  const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1200);
-  camera.position.set(0, 8, -14);
+  const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1600);
+  camera.position.set(0, 8, 14);
 
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+  function onResize() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+    renderer.setSize(w, h);
+  }
+  window.addEventListener("resize", onResize);
 
-  return { renderer, scene, camera, sun, hemi };
+  return { renderer, scene, camera, sun, onResize };
+}
+
+// Third-person follow camera with drag orbit + pitch clamp.
+export function updateCamera(camera, target, yaw, pitch, dist, dt) {
+  const px = target.x + Math.sin(yaw) * Math.cos(pitch) * dist;
+  const pz = target.z + Math.cos(yaw) * Math.cos(pitch) * dist;
+  const py = target.y + 2.2 + Math.sin(pitch) * dist;
+  const desired = new THREE.Vector3(px, Math.max(py, target.y + 1.2), pz);
+  camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
+  camera.lookAt(target.x, target.y + 1.6, target.z);
 }
