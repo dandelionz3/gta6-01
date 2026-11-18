@@ -5,120 +5,107 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Solmar Bay — gta6-01</title>
 <style>
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1a1410; font-family: 'Segoe UI', Arial, sans-serif; }
-  #game { display: block; width: 100%; height: 100%; touch-action: none; }
-  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; z-index: 5; }
-  .panel { background: rgba(10, 12, 16, 0.55); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; backdrop-filter: blur(2px); }
-  #top-left { position: absolute; top: 14px; left: 14px; padding: 10px 14px; min-width: 210px; }
-  #health-bar { width: 190px; height: 12px; background: rgba(255,255,255,0.18); border-radius: 6px; overflow: hidden; }
-  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #37d67a, #7be495); transition: width 0.15s; }
-  #health-row { display: flex; justify-content: space-between; font-size: 12px; margin-top: 4px; color: #dfe8df; }
-  #cash { font-size: 22px; font-weight: 700; color: #7be495; margin-top: 6px; }
-  #top-right { position: absolute; top: 14px; right: 14px; padding: 8px 14px; text-align: right; }
-  #stars { font-size: 24px; letter-spacing: 3px; color: #ffd24a; text-shadow: 0 0 8px rgba(0,0,0,0.8); }
-  #stars.hot { color: #ff5a3c; animation: pulse 0.7s infinite alternate; }
-  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.12); } }
-  #objective { margin-top: 4px; font-size: 13px; color: #ffe9a8; max-width: 260px; }
-  #minimap { position: absolute; right: 14px; bottom: 14px; width: 180px; height: 180px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: #20261f; }
-  #speed-box { position: absolute; right: 210px; bottom: 18px; padding: 8px 14px; text-align: center; display: none; }
-  #speed { font-size: 30px; font-weight: 800; line-height: 1; }
-  #speed-box .unit { font-size: 11px; color: #cfd8cf; }
-  #ammo-box { position: absolute; right: 210px; bottom: 96px; padding: 6px 12px; font-size: 15px; display: none; }
-  #banner { position: absolute; top: 18%; left: 50%; transform: translateX(-50%) translateY(-8px); text-align: center; opacity: 0; transition: opacity 0.25s, transform 0.25s; padding: 14px 34px; }
-  #banner.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  #banner-title { font-size: 34px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 10px rgba(0,0,0,0.7); }
-  #banner-sub { font-size: 15px; color: #ffe9a8; margin-top: 4px; }
-  #toast { position: absolute; bottom: 210px; left: 50%; transform: translateX(-50%); padding: 8px 18px; font-size: 14px; opacity: 0; transition: opacity 0.25s; white-space: nowrap; }
-  #toast.show { opacity: 1; }
-  #hint { position: absolute; left: 14px; bottom: 14px; padding: 8px 12px; font-size: 12px; color: #dfe8df; line-height: 1.5; }
-  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; display: none; }
-  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; box-shadow: 0 0 4px #000; }
-  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
-  #crosshair::after { top: 10px; left: 0; height: 2px; width: 22px; }
-  #vignette { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.25s; background: radial-gradient(ellipse at center, transparent 55%, rgba(200,0,0,0.55) 100%); }
-  #mute-icon { position: absolute; left: 14px; top: 120px; padding: 4px 10px; font-size: 13px; display: none; }
-  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 10; color: #fff; text-align: center; background: rgba(8, 8, 14, 0.72); }
-  .screen h1 { font-size: 54px; margin: 0; letter-spacing: 2px; text-shadow: 0 4px 24px rgba(255, 150, 60, 0.6); }
-  .screen h2 { font-size: 44px; margin: 0; letter-spacing: 2px; }
-  .screen .tag { font-size: 17px; color: #ffd9a0; margin: 10px 0 22px; }
-  .screen .keys { font-size: 14px; line-height: 1.9; color: #e8e4da; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 14px 26px; text-align: left; }
-  .screen .keys b { color: #ffd24a; display: inline-block; min-width: 118px; }
-  .screen .press { margin-top: 26px; font-size: 15px; color: #fff; animation: pulse 1.1s infinite alternate; }
-  #mission-list { width: 520px; max-width: 88vw; margin-top: 8px; }
-  .mission-row { display: flex; gap: 12px; align-items: center; padding: 10px 14px; margin: 6px 0; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; cursor: pointer; pointer-events: auto; text-align: left; }
-  .mission-row:hover { background: rgba(255,210,74,0.18); }
-  .mission-row.current { border-color: #ffd24a; }
-  .mission-row.done { opacity: 0.55; }
-  .m-num { font-weight: 800; color: #ffd24a; }
-  .m-name { flex: 1; font-weight: 600; }
-  .m-reward { color: #7be495; }
-  .m-state { font-size: 12px; color: #ffe9a8; }
-  .mission-done { margin-top: 10px; color: #7be495; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #10131a; font-family: Arial, Helvetica, sans-serif; }
+  #game-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(8, 10, 18, 0.72); color: #f2f2f2; z-index: 40; text-align: center; padding: 24px; }
+  .overlay h1 { font-size: 52px; letter-spacing: 4px; color: #ffd23e; text-shadow: 0 3px 18px rgba(0,0,0,0.8); }
+  .overlay h2 { font-size: 30px; letter-spacing: 2px; color: #ffd23e; margin-bottom: 12px; }
+  .overlay p { max-width: 560px; line-height: 1.5; margin: 8px 0; color: #ddd; }
+  .overlay button { margin-top: 18px; padding: 14px 42px; font-size: 18px; font-weight: bold; background: #ffd23e; color: #141414; border: none; border-radius: 6px; cursor: pointer; }
+  .overlay button:hover { background: #ffe27a; }
+  .controls { margin-top: 14px; font-size: 14px; color: #bbb; line-height: 1.7; }
+  .controls b { color: #fff; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; color: #fff; }
+  #health-box { position: absolute; left: 18px; bottom: 18px; width: 220px; }
+  #health-bar { height: 14px; background: rgba(0,0,0,0.55); border: 1px solid #fff; border-radius: 3px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: #3aa84a; }
+  #health-text { font-size: 13px; margin-top: 3px; text-shadow: 0 1px 3px #000; }
+  #cash { position: absolute; left: 18px; top: 16px; font-size: 26px; font-weight: bold; color: #7dd87d; text-shadow: 0 2px 4px #000; }
+  #stars { position: absolute; right: 18px; top: 14px; font-size: 30px; letter-spacing: 4px; text-shadow: 0 2px 4px #000; }
+  #objective { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); padding: 8px 18px; border-radius: 4px; font-size: 16px; border-left: 4px solid #ffd23e; max-width: 60%; text-align: center; }
+  #minimap { position: absolute; right: 18px; bottom: 18px; width: 180px; height: 180px; border: 2px solid rgba(255,255,255,0.7); border-radius: 4px; background: rgba(20,32,44,0.8); }
+  #speed-box { position: absolute; right: 210px; bottom: 22px; text-align: right; text-shadow: 0 2px 4px #000; display: none; }
+  #speed { font-size: 44px; font-weight: bold; }
+  #speed-box small { font-size: 14px; color: #ddd; }
+  #ammo { position: absolute; left: 18px; bottom: 64px; font-size: 16px; text-shadow: 0 1px 3px #000; display: none; }
+  #hint { position: absolute; left: 18px; bottom: 96px; font-size: 12px; color: #ccc; text-shadow: 0 1px 3px #000; line-height: 1.6; }
+  #toast { position: absolute; top: 76px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.65); padding: 8px 16px; border-radius: 4px; font-size: 15px; opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; display: none; }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; box-shadow: 0 0 3px #000; }
+  #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+  #crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: 0; transition: opacity 0.15s; background: radial-gradient(ellipse at center, transparent 55%, rgba(200,0,0,0.55) 100%); }
+  #mute-tag { position: absolute; left: 18px; top: 56px; font-size: 13px; color: #ffb0b0; text-shadow: 0 1px 3px #000; display: none; }
+  #mission-menu { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(10,12,20,0.92); border: 1px solid #ffd23e; border-radius: 8px; padding: 22px 26px; z-index: 30; color: #fff; display: none; pointer-events: auto; min-width: 380px; }
+  #mission-menu h3 { color: #ffd23e; margin-bottom: 12px; }
+  .mission-row { padding: 8px 6px; border-bottom: 1px solid #333; font-size: 15px; }
+  .mission-row.current { color: #ffd23e; font-weight: bold; }
+  .mission-row.done { color: #7dd87d; }
+  #mission-menu button { margin-top: 14px; padding: 8px 20px; background: #ffd23e; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+  #mission-menu p { font-size: 13px; color: #bbb; margin-top: 10px; }
 </style>
-</head>
-<body>
-<canvas id="game"></canvas>
-<div id="hud">
-  <div id="vignette"></div>
-  <div id="top-left" class="panel">
-    <div id="health-bar"><div id="health-fill"></div></div>
-    <div id="health-row"><span>HEALTH</span><span id="health-text">100</span></div>
-    <div id="cash">$0</div>
-  </div>
-  <div id="top-right" class="panel">
-    <div id="stars">☆☆☆☆☆</div>
-    <div id="objective">Press M to start the first mission</div>
-  </div>
-  <div id="speed-box" class="panel"><div id="speed">0</div><div class="unit">km/h</div></div>
-  <div id="ammo-box" class="panel">AMMO <span id="ammo">36</span></div>
-  <canvas id="minimap" width="180" height="180"></canvas>
-  <div id="banner" class="panel"><div id="banner-title"></div><div id="banner-sub"></div></div>
-  <div id="toast" class="panel"></div>
-  <div id="hint" class="panel">WASD move / drive &nbsp;·&nbsp; Shift sprint &nbsp;·&nbsp; Space jump / handbrake<br>E enter car &nbsp;·&nbsp; F punch &nbsp;·&nbsp; Click shoot &nbsp;·&nbsp; Drag orbit camera<br>M missions &nbsp;·&nbsp; Esc pause &nbsp;·&nbsp; P mute</div>
-  <div id="crosshair"></div>
-  <div id="mute-icon" class="panel">MUTED — press P</div>
-</div>
-
-<div id="screen-title" class="screen">
-  <h1>SOLMAR BAY</h1>
-  <div class="tag">A sun-soaked open-world crime story — drive, steal, outrun the law.</div>
-  <div class="keys">
-    <div><b>W A S D</b> move / drive</div>
-    <div><b>Shift</b> sprint &nbsp;&nbsp; <b>Space</b> jump / handbrake</div>
-    <div><b>E</b> enter / exit car &nbsp;&nbsp; <b>F</b> punch</div>
-    <div><b>Mouse click</b> shoot pistol &nbsp;&nbsp; <b>Drag</b> orbit camera</div>
-    <div><b>M</b> mission menu &nbsp;&nbsp; <b>Esc</b> pause &nbsp;&nbsp; <b>P</b> mute</div>
-  </div>
-  <div class="press">Press any key or click to start</div>
-</div>
-
-<div id="screen-pause" class="screen">
-  <h2>PAUSED</h2>
-  <div class="press">Press Esc to keep playing</div>
-</div>
-
-<div id="screen-busted" class="screen">
-  <h2>BUSTED</h2>
-  <div class="tag">The Solmar Bay PD caught up with Rook. Cash seized, case dropped — this time.</div>
-  <div class="press">Press any key to walk out of Solmar General</div>
-</div>
-
-<div id="screen-wasted" class="screen">
-  <h2>WASTED</h2>
-  <div class="tag">Rook went down hard. The city keeps moving without him — until he gets up.</div>
-  <div class="press">Press any key to walk out of Solmar General</div>
-</div>
-
-<div id="screen-mission" class="screen">
-  <h2>MISSIONS</h2>
-  <div class="tag">Click a mission to start it. Progress is saved automatically.</div>
-  <div id="mission-list"></div>
-  <div class="press">Press M or Esc to close</div>
-</div>
-
 <script type="importmap">
 { "imports": { "three": "./vendor/three/three.module.min.js" } }
 </script>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<div id="hud">
+  <div id="cash">$120</div>
+  <div id="mute-tag">MUTED (P)</div>
+  <div id="stars">☆☆☆☆☆</div>
+  <div id="objective">Steal a car, then drive to the marker</div>
+  <div id="toast"></div>
+  <div id="crosshair"></div>
+  <div id="health-box">
+    <div id="health-bar"><div id="health-fill"></div></div>
+    <div id="health-text">100</div>
+  </div>
+  <div id="ammo">Pistol 24</div>
+  <div id="hint">WASD move / drive &nbsp;·&nbsp; E enter car &nbsp;·&nbsp; F punch &nbsp;·&nbsp; Click shoot<br>Shift sprint &nbsp;·&nbsp; Space jump / handbrake &nbsp;·&nbsp; M missions &nbsp;·&nbsp; P mute</div>
+  <div id="speed-box"><span id="speed">0</span> <small>km/h</small></div>
+  <canvas id="minimap" width="180" height="180"></canvas>
+</div>
+<div id="vignette"></div>
+
+<div id="mission-menu">
+  <h3>Missions — Solmar Bay</h3>
+  <div id="mission-list"></div>
+  <p>Press 1–5 to jump to a mission. Progress is saved.</p>
+  <button id="mission-close">Close</button>
+</div>
+
+<div id="screen-title" class="overlay">
+  <h1>SOLMAR BAY</h1>
+  <p>Rook is back in the city that never lets go. Steal cars, outrun the law, run five story missions and take the big score.</p>
+  <button id="start-btn">START GAME</button>
+  <div class="controls">
+    <b>WASD</b> move / drive &nbsp;·&nbsp; <b>Shift</b> sprint &nbsp;·&nbsp; <b>Space</b> jump / handbrake<br>
+    <b>E</b> enter / exit car &nbsp;·&nbsp; <b>F</b> punch &nbsp;·&nbsp; <b>Mouse click</b> shoot pistol &nbsp;·&nbsp; <b>Drag mouse</b> camera<br>
+    <b>M</b> mission menu &nbsp;·&nbsp; <b>Esc</b> pause &nbsp;·&nbsp; <b>P</b> mute
+  </div>
+</div>
+
+<div id="screen-pause" class="overlay" style="display:none">
+  <h2>PAUSED</h2>
+  <p>Take a breath. The city waits.</p>
+  <button id="resume-btn">RESUME</button>
+</div>
+
+<div id="screen-busted" class="overlay" style="display:none">
+  <h2>BUSTED</h2>
+  <p>The cops caught up with Rook. You lose some cash — but the city is still yours to take back.</p>
+  <p>Press Enter to get back out there.</p>
+</div>
+
+<div id="screen-wasted" class="overlay" style="display:none">
+  <h2>WASTED</h2>
+  <p>Rook went down. The hospital patched him up — for a fee.</p>
+  <p>Press Enter to get back out there.</p>
+</div>
+
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

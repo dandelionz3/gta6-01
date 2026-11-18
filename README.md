@@ -3,7 +3,7 @@
 [![rank](https://make.fun/badge/gta6-01/dandelionz3/gta6-01/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 [![reward](https://make.fun/badge/gta6-01/dandelionz3/gta6-01/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
-Solmar Bay is a sun-soaked open-world crime game built for the make.fun gta6-01 bounty: drive the coastal avenues, steal cars, outrun the Solmar Bay PD through a five-star wanted system, and run a five-mission story chain as Rook, a small-time driver pulled back into the city's underworld. Traffic, pedestrians, gang shootouts, a living minimap, procedural sound and a full save system — all in plain Three.js, playable from static files with no network requests.
+Solmar Bay is an open-world crime game in the spirit of GTA 6, built with Three.js and playable in a desktop browser from static files. You are Rook, a small-time driver drawn back into the city's underworld: drive and steal cars, outrun the police across five wanted levels, and run a five-mission story chain — from your first stolen wheels to the big score — across a sun-soaked coastal city with traffic, pedestrians, beaches, a pier, combat, and a full HUD with minimap.
 
 ## Run it
 
@@ -13,9 +13,11 @@ node serve.ts
 
 then open http://localhost:8080
 
+## Controls
+
 | Key | Action |
 | --- | --- |
-| W A S D | Move / drive |
+| WASD | Move / drive |
 | Shift | Sprint |
 | Space | Jump (on foot) / handbrake (driving) |
 | E | Enter / exit car |

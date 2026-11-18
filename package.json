@@ -1,1 +1,1 @@
-{"description":"Solmar Bay — open-world crime game for the make.fun gta6-01 bounty","name":"gta6-01","private":true,"scripts":{"start":"node serve.ts"},"type":"module","version":"1.0.0"}
+{"description":"Solmar Bay — open-world crime game for the make.fun gta6-01 bounty","name":"gta6-01","private":true,"scripts":{"build":"node main.ts","start":"node serve.ts"},"type":"module","version":"1.0.0"}

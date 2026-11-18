@@ -1,8 +1,8 @@
-// Seeded randomness for Solmar Bay. Gameplay never touches Math.random
-// or Date.now — the same seed always builds the same city, so the staged
-// screenshot scenes are reproducible shot after shot.
+// Seeded randomness for Solmar Bay.
+// Gameplay never calls Math.random or Date.now: every shuffle, spawn
+// and wander target comes from one of these generators, so a given
+// seed always rebuilds the same city and the same staged screenshots.
 
-// mulberry32: tiny, fast, good-enough PRNG with a 32-bit state.
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return function next() {
@@ -14,46 +14,34 @@ export function mulberry32(seed) {
   };
 }
 
-// Small convenience wrapper so call sites read like plain English.
 export class Rng {
-  constructor(seed = 1337) {
+  constructor(seed = 1) {
     this.nextFn = mulberry32(seed);
-    this.seed = seed >>> 0;
   }
 
-  // Float in [0, 1).
   next() {
     return this.nextFn();
   }
 
-  // Float in [min, max).
   range(min, max) {
-    return min + this.next() * (max - min);
+    return min + this.nextFn() * (max - min);
   }
 
-  // Integer in [min, max] inclusive.
   int(min, max) {
+    // inclusive on both ends
     return Math.floor(this.range(min, max + 1));
   }
 
-  // True with probability p (0..1).
-  chance(p) {
-    return this.next() < p;
-  }
-
-  // One element from a non-empty array.
   pick(list) {
-    return list[Math.floor(this.next() * list.length)];
+    return list[Math.floor(this.nextFn() * list.length)];
   }
 
-  // A fresh Rng forked off this one (handy for subsystems).
-  fork(salt = 1) {
-    return new Rng((this.seed ^ Math.imul(salt, 2654435761)) >>> 0);
+  chance(probability) {
+    return this.nextFn() < probability;
   }
-}
 
-// Deterministic pick of an element by index — used by traffic routes so
-// a route never depends on call order.
-export function pickAt(list, u) {
-  return list[Math.floor(u * list.length) % list.length];
+  // Random point inside a rectangle, handy for scattering props.
+  pointIn(minX, maxX, minZ, maxZ) {
+    return { x: this.range(minX, maxX), z: this.range(minZ, maxZ) };
+  }
 }

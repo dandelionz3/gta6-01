@@ -1,117 +1,101 @@
-// Keyboard + mouse state for Solmar Bay. The game polls this object each
-// frame; edge-triggered actions (click, single key presses) are consumed
-// through the `pressed` set, which the main loop clears at the end of
-// every frame. Camera orbit comes from pointer drags, not pointer lock,
-// so the game also works inside an iframe or a screenshot harness.
+// Keyboard + mouse state for Solmar Bay.
+// The game polls this object every frame; nothing here knows about
+// cars, missions or the HUD — it only reports what the player did.
 
-// Tracks held keys, single-press edges, drag deltas and click edges.
 export class Input {
-  constructor(target) {
-    this.target = target || window;
+  constructor() {
     this.keys = new Set();
+    this.dragDX = 0;
+    this.dragDY = 0;
     this.pressed = new Set();
-    this.dragX = 0;
-    this.dragY = 0;
-    this.mouseDown = false;
-    this.clicked = false;
-    this.wheel = 0;
-    this._lastX = 0;
-    this._lastY = 0;
-    this._onKeyDown = (e) => {
-      if (e.repeat) return;
-      this.keys.add(e.code);
-      this.pressed.add(e.code);
-      if (e.code === 'Space') e.preventDefault();
-    };
-    this._onKeyUp = (e) => this.keys.delete(e.code);
-    this._onMouseDown = (e) => {
-      this.mouseDown = true;
-      this._lastX = e.clientX;
-      this._lastY = e.clientY;
-      if (e.button === 0) this.clicked = true;
-    };
-    this._onMouseUp = () => {
-      this.mouseDown = false;
-    };
-    this._onMouseMove = (e) => {
-      if (!this.mouseDown) return;
-      this.dragX += e.clientX - this._lastX;
-      this.dragY += e.clientY - this._lastY;
-      this._lastX = e.clientX;
-      this._lastY = e.clientY;
-    };
-    this._onBlur = () => {
-      this.keys.clear();
-      this.mouseDown = false;
-    };
-    this._onWheel = (e) => {
-      this.wheel += e.deltaY;
-    };
-    window.addEventListener('keydown', this._onKeyDown);
-    window.addEventListener('keyup', this._onKeyUp);
-    this.target.addEventListener('mousedown', this._onMouseDown);
-    window.addEventListener('mouseup', this._onMouseUp);
-    window.addEventListener('mousemove', this._onMouseMove);
-    window.addEventListener('blur', this._onBlur);
-    window.addEventListener('wheel', this._onWheel, { passive: true });
+    this.mouseHeld = false;
+    this.mouseClicked = false;
+    this.dragging = false;
+    this.lastX = 0;
+    this.lastY = 0;
+    this.attached = false;
   }
 
-  // Held right now?
+  attach(element) {
+    if (this.attached) return;
+    this.attached = true;
+    const target = element || document.body;
+
+    window.addEventListener('keydown', (event) => {
+      if (event.repeat) return;
+      this.keys.add(event.code);
+      this.pressed.add(event.code);
+      if (['Space', 'ArrowUp', 'ArrowDown'].includes(event.code)) {
+        event.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', (event) => {
+      this.keys.delete(event.code);
+    });
+    window.addEventListener('blur', () => {
+      this.keys.clear();
+      this.mouseHeld = false;
+      this.dragging = false;
+    });
+
+    target.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return;
+      this.mouseHeld = true;
+      this.mouseClicked = true;
+      this.dragging = true;
+      this.lastX = event.clientX;
+      this.lastY = event.clientY;
+    });
+    window.addEventListener('mousemove', (event) => {
+      if (!this.dragging) return;
+      this.dragDX += event.clientX - this.lastX;
+      this.dragDY += event.clientY - this.lastY;
+      this.lastX = event.clientX;
+      this.lastY = event.clientY;
+    });
+    window.addEventListener('mouseup', () => {
+      this.mouseHeld = false;
+      this.dragging = false;
+    });
+    target.addEventListener('contextmenu', (event) => event.preventDefault());
+  }
+
   down(code) {
     return this.keys.has(code);
   }
 
-  // Pressed since the last endFrame()?
-  hit(code) {
+  // True once, on the frame the key went down.
+  wasPressed(code) {
     return this.pressed.has(code);
   }
 
-  // Any of these movement keys held?
-  get moveX() {
-    const l = this.down('KeyA') || this.down('ArrowLeft') ? 1 : 0;
-    const r = this.down('KeyD') || this.down('ArrowRight') ? 1 : 0;
-    return r - l;
+  // Forward/back and strafe as -1..1, from WASD or the arrow keys.
+  moveAxis() {
+    const fwd =
+      (this.down('KeyW') || this.down('ArrowUp') ? 1 : 0) -
+      (this.down('KeyS') || this.down('ArrowDown') ? 1 : 0);
+    const strafe =
+      (this.down('KeyD') || this.down('ArrowRight') ? 1 : 0) -
+      (this.down('KeyA') || this.down('ArrowLeft') ? 1 : 0);
+    return { fwd, strafe };
   }
 
-  get moveY() {
-    const f = this.down('KeyW') || this.down('ArrowUp') ? 1 : 0;
-    const b = this.down('KeyS') || this.down('ArrowDown') ? 1 : 0;
-    return f - b;
+  consumeDrag() {
+    const out = { dx: this.dragDX, dy: this.dragDY };
+    this.dragDX = 0;
+    this.dragDY = 0;
+    return out;
   }
 
-  // Drain the accumulated drag since the last frame.
-  takeDrag() {
-    const d = { x: this.dragX, y: this.dragY };
-    this.dragX = 0;
-    this.dragY = 0;
-    return d;
+  consumeClick() {
+    const was = this.mouseClicked;
+    this.mouseClicked = false;
+    return was;
   }
 
-  takeClick() {
-    const c = this.clicked;
-    this.clicked = false;
-    return c;
-  }
-
-  takeWheel() {
-    const w = this.wheel;
-    this.wheel = 0;
-    return w;
-  }
-
-  // Call once per frame after the game has read the edges.
+  // Called at the end of every frame so one press is never read twice.
   endFrame() {
     this.pressed.clear();
-    this.clicked = false;
-  }
-
-  dispose() {
-    window.removeEventListener('keydown', this._onKeyDown);
-    window.removeEventListener('keyup', this._onKeyUp);
-    this.target.removeEventListener('mousedown', this._onMouseDown);
-    window.removeEventListener('mouseup', this._onMouseUp);
-    window.removeEventListener('mousemove', this._onMouseMove);
-    window.removeEventListener('blur', this._onBlur);
-    window.removeEventListener('wheel', this._onWheel);
+    this.mouseClicked = false;
   }
 }
