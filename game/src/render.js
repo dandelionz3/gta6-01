@@ -1,33 +1,55 @@
-import * as THREE from 'three';
-export function createRender() {
-  const canvas = document.querySelector('#game');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+// Renderer, sky, lights and camera rig. Keeps all three.js boilerplate in
+// one place; the game loop only asks for the scene, camera and a resize.
+import * as THREE from "three";
+import { CFG } from "./config.js";
+
+export function createStage(canvas) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.25;
+  renderer.toneMappingExposure = 1.05;
+
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xeab89b);
-  scene.fog = new THREE.Fog(0xeab89b, 110, 480);
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.2, 950);
-  scene.add(new THREE.HemisphereLight(0xa9deed, 0x8b6549, 2.4));
-  const sun = new THREE.DirectionalLight(0xffd1a0, 3.3);
-  sun.position.set(-100, 180, 80); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -110, right: 110, top: 110, bottom: -110, far: 450 });
-  sun.shadow.bias = -0.001;
-  scene.add(sun); scene.add(sun.target);
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(800, 24, 16), new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false,
-    vertexShader: 'varying vec3 v; void main(){v=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-    fragmentShader: 'varying vec3 v; void main(){float h=clamp(normalize(v).y*1.7,0.,1.);gl_FragColor=vec4(mix(vec3(1.,.67,.46),vec3(.23,.52,.68),h),1.);}'
-  }));
+  scene.fog = new THREE.Fog(CFG.palette.fog, 90, 420);
+
+  // Sunset sky dome: vertical gradient baked into a shader sphere.
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    uniforms: {
+      top: { value: new THREE.Color(CFG.palette.skyTop) },
+      bottom: { value: new THREE.Color(CFG.palette.skyBottom) },
+    },
+    vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `varying vec3 vP; uniform vec3 top; uniform vec3 bottom;
+      void main(){ float h = normalize(vP).y * 0.5 + 0.5; gl_FragColor = vec4(mix(bottom, top, pow(h, 0.8)), 1.0); }`,
+  });
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 24, 16), skyMat);
   scene.add(sky);
-  const disk = new THREE.Mesh(new THREE.SphereGeometry(20, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffe7ac }));
-  disk.position.set(-330, 95, 390); scene.add(disk);
-  const resize = () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); };
-  window.addEventListener('resize', resize); resize();
-  return { canvas, renderer, scene, camera, sun };
+
+  // Low late-afternoon sun + warm ambient fill.
+  const sun = new THREE.DirectionalLight(CFG.palette.sun, 2.4);
+  sun.position.set(-90, 70, 60);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -180; sun.shadow.camera.right = 180;
+  sun.shadow.camera.top = 180; sun.shadow.camera.bottom = -180;
+  sun.shadow.camera.far = 500;
+  scene.add(sun);
+  const hemi = new THREE.HemisphereLight(0x8aa0c8, 0x6a4a30, 0.9);
+  scene.add(hemi);
+
+  const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1200);
+  camera.position.set(0, 8, -14);
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  return { renderer, scene, camera, sun, hemi };
 }

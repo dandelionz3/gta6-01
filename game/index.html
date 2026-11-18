@@ -1,24 +1,134 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Solmar Bay — A Rook Story</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Solmar Bay — Make GTA 6</title>
 <style>
-:root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif;color:#fff5dd;background:#152b35}*{box-sizing:border-box}body{margin:0;overflow:hidden}button{font:inherit;cursor:pointer}#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}#hud{position:fixed;inset:0;pointer-events:none;text-shadow:0 2px 5px #14232c}#brand{position:absolute;top:30px;left:34px;font-size:14px;letter-spacing:5px;font-weight:bold}#district{margin-top:7px;font-weight:normal;font-size:11px;letter-spacing:2px;color:#b9e4d9}.status{position:absolute;right:34px;top:24px;text-align:right}#stars{font-size:32px;letter-spacing:4px;color:#ffdf8c;height:39px}#cash{font-size:26px;font-weight:bold;color:#b6ffcf;font-variant-numeric:tabular-nums}#health{display:inline-block;margin-top:13px;width:170px;height:8px;background:#213b43;border:1px solid #b4d5c280}#health-fill{height:100%;width:100%;background:#89edb1}#ammo{font-size:12px;letter-spacing:2px;margin-top:9px}#objective{position:absolute;left:50%;top:34px;transform:translateX(-50%);max-width:55%;text-align:center;background:linear-gradient(90deg,transparent,#102e39d9,transparent);padding:12px 38px;border-top:1px solid #ade6ce80;font-size:15px;letter-spacing:1px}#objective small{display:block;color:#91e9c4;font-size:10px;margin-bottom:6px;letter-spacing:3px}#toast{position:absolute;left:50%;bottom:140px;transform:translateX(-50%);background:#12333be8;border-left:3px solid #b2ffd8;padding:15px 23px;max-width:560px;font-size:15px;line-height:1.5;transition:opacity .2s}#map-wrap{position:absolute;left:30px;bottom:42px;width:220px;height:220px;background:#15323b;border:2px solid #c9d3b6a0;box-shadow:0 8px 30px #0005;border-radius:4px;overflow:hidden}#map{width:100%;height:100%}#map-label{position:absolute;left:0;bottom:0;right:0;padding:5px;background:#142d36bd;font-size:10px;letter-spacing:3px;text-align:center}#speed{position:absolute;right:36px;bottom:70px;font-size:58px;font-weight:800;font-style:italic}#speed small{display:block;font-size:11px;letter-spacing:4px;text-align:right;font-style:normal;color:#bce8db}#hint{position:absolute;left:278px;bottom:43px;font-size:11px;letter-spacing:.4px;color:#e8ead6;max-width:600px;line-height:1.8}#prompt{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);font-size:13px;background:#14333ce0;padding:9px 17px;border:1px solid #b4ecd480}#crosshair{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);border:1px solid #fffa;border-radius:50%}#crosshair:after{content:'';position:absolute;left:7px;top:7px;width:2px;height:2px;background:white}#vignette{position:absolute;inset:0;box-shadow:inset 0 0 130px 25px #bd242e;opacity:0}#waypoint{position:absolute;left:50%;top:115px;color:#b1ffce;font-size:22px;text-align:center}#waypoint span{display:block;font-size:10px;letter-spacing:2px}#escape{position:absolute;right:35px;top:145px;font-size:11px;color:#ffe5b2;letter-spacing:1px}#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(90deg,#0b2637ef,#143541a0 65%,#12303b33);backdrop-filter:blur(3px)}.panel{width:min(700px,90vw);max-height:90vh;overflow:auto;padding:38px 44px;background:#102f3bd9;border:1px solid #f1d39a5c;box-shadow:0 20px 80px #0005}.eyebrow{font-size:11px;letter-spacing:5px;color:#a3f5d1}.panel h1{font-size:clamp(48px,7vw,88px);line-height:.9;letter-spacing:-5px;margin:22px 0;color:#ffe4b8}.panel h1 em{font-style:normal;color:#9cf2cd}.panel p{color:#d5e2d6;line-height:1.7;font-size:14px}.panel h2{font-size:35px;color:#ffe0a6;margin:12px 0 20px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}.actions button,.job{background:#b0efd0;color:#153542;border:0;padding:13px 22px;font-weight:bold;letter-spacing:1px}.actions button.secondary{background:transparent;color:#e9edda;border:1px solid #acd8cc66}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:24px;font-size:11px;color:#d9e6da;line-height:1.8}.controls b{color:#ffda9e;letter-spacing:1px}.fineprint{font-size:10px!important;letter-spacing:2px;color:#9bbdb6!important}.job{display:flex;justify-content:space-between;width:100%;margin-top:8px;text-align:left;padding:14px 18px}.job:disabled{opacity:.35;cursor:default}.job span{font-size:12px}.hidden{display:none!important}#error{position:fixed;bottom:0;left:0;background:#7a2030;color:white;z-index:20;white-space:pre-wrap;padding:10px;max-width:100%}@media(max-width:800px){#objective{top:95px;max-width:90%;width:80%;font-size:12px}#map-wrap{width:170px;height:170px}#hint{left:220px;max-width:45%;font-size:9px}#brand{font-size:11px}.panel{padding:25px}#waypoint{top:165px}}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1410;
+    font-family: "Segoe UI", Arial, sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    flex-direction: column; background: rgba(12, 10, 16, 0.72); z-index: 20; text-align: center; padding: 20px; }
+  .screen h1 { font-size: 56px; letter-spacing: 6px; color: #ffc020; text-shadow: 0 4px 24px rgba(255, 160, 32, 0.5); }
+  .screen h2 { font-size: 34px; letter-spacing: 4px; margin-bottom: 10px; }
+  .screen p { max-width: 560px; line-height: 1.6; color: #ddd; margin: 8px 0; }
+  .screen .sub { color: #ffb36b; font-size: 18px; letter-spacing: 2px; }
+  button { cursor: pointer; border: none; border-radius: 8px; padding: 13px 34px; margin: 8px;
+    font-size: 17px; font-weight: 700; background: #ffc020; color: #1a1408; }
+  button:hover { background: #ffd75e; }
+  button.ghost { background: rgba(255,255,255,0.14); color: #fff; }
+  .controls { display: grid; grid-template-columns: auto auto; gap: 4px 18px; text-align: left;
+    margin: 16px 0; font-size: 15px; color: #ccc; }
+  .controls b { color: #fff; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
+  #health-wrap { position: absolute; left: 18px; bottom: 18px; width: 220px; }
+  #health-label { font-size: 12px; letter-spacing: 2px; color: #eee; text-shadow: 0 1px 3px #000; }
+  #health-bar { height: 12px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: #3ddc5a; }
+  #cash { position: absolute; right: 18px; top: 52px; font-size: 26px; font-weight: 800; color: #7ddc8a;
+    text-shadow: 0 2px 4px #000; }
+  #stars { position: absolute; right: 18px; top: 14px; font-size: 28px; letter-spacing: 4px;
+    text-shadow: 0 2px 4px #000; }
+  #speed { position: absolute; right: 18px; bottom: 18px; font-size: 30px; font-weight: 800;
+    text-shadow: 0 2px 4px #000; }
+  #ammo { position: absolute; left: 18px; bottom: 58px; font-size: 15px; color: #eee; text-shadow: 0 1px 3px #000; }
+  #objective { position: absolute; left: 18px; top: 14px; max-width: 420px; font-size: 16px; font-weight: 600;
+    color: #ffe9a0; text-shadow: 0 2px 4px #000; }
+  #minimap { position: absolute; left: 18px; top: 52px; width: 180px; height: 180px;
+    border: 2px solid rgba(255,255,255,0.55); border-radius: 8px; background: rgba(10,14,18,0.7); }
+  #banner { position: absolute; left: 50%; top: 16%; transform: translateX(-50%); text-align: center;
+    opacity: 0; transition: opacity 0.4s; text-shadow: 0 3px 10px #000; }
+  .banner-title { font-size: 40px; font-weight: 900; letter-spacing: 5px; color: #ffc020; }
+  .banner-sub { font-size: 17px; color: #fff; margin-top: 4px; }
+  #toast { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); font-size: 17px;
+    background: rgba(0,0,0,0.6); padding: 8px 18px; border-radius: 20px; opacity: 0; transition: opacity 0.3s; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+    display: none; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 3px #000; }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { left: 0; top: 10px; width: 22px; height: 2px; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 15; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(200,0,0,0.55) 100%); transition: opacity 0.15s; }
+  #hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 13px;
+    color: rgba(255,255,255,0.75); text-shadow: 0 1px 3px #000; white-space: nowrap; }
+  #btn-mute { position: absolute; right: 18px; top: 96px; pointer-events: auto; padding: 6px 12px;
+    font-size: 13px; background: rgba(0,0,0,0.5); color: #fff; }
+  #mission-list { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+  .mission-item { background: rgba(255,255,255,0.1); color: #fff; text-align: left; padding: 12px 18px; }
+  .mission-item span { font-weight: 400; font-size: 14px; color: #ccc; }
 </style>
-<script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js"}}</script>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
 </head>
 <body>
-<canvas id="game" aria-label="Solmar Bay 3D game"></canvas>
+<canvas id="game"></canvas>
+<div id="vignette"></div>
+
 <div id="hud">
-  <div id="brand">SOLMAR BAY<div id="district">A ROOK STORY · 17:42</div></div>
-  <div class="status"><div id="stars"></div><div id="cash">$250</div><div id="health"><div id="health-fill"></div></div><div id="ammo"></div></div>
-  <div id="objective"></div><div id="waypoint"></div><div id="escape"></div>
-  <div id="map-wrap"><canvas id="map" width="440" height="440"></canvas><div id="map-label">SOLMAR BAY · N ↑</div></div>
-  <div id="speed"></div><div id="hint"></div><div id="prompt"></div><div id="crosshair"></div><div id="toast"></div><div id="vignette"></div>
+  <div id="objective"></div>
+  <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="stars">☆☆☆☆☆</div>
+  <div id="cash">$120</div>
+  <button id="btn-mute">🔊 Sound</button>
+  <div id="speed"></div>
+  <div id="ammo"></div>
+  <div id="health-wrap">
+    <div id="health-label">HEALTH</div>
+    <div id="health-bar"><div id="health-fill"></div></div>
+  </div>
+  <div id="banner"></div>
+  <div id="toast"></div>
+  <div id="crosshair"></div>
+  <div id="hint">WASD move / drive · E enter car · F punch · Click shoot · M missions · Esc pause · P mute</div>
 </div>
-<div id="overlay"></div>
+
+<div class="screen" id="screen-title" style="display:flex">
+  <h1>SOLMAR BAY</h1>
+  <div class="sub">AN OPEN-WORLD CRIME STORY</div>
+  <p>You are Rook, a small-time driver drawn back into the underworld of a sun-soaked
+  coastal city. Steal cars, outrun the cops, and run five story missions to take the big score.</p>
+  <div class="controls">
+    <span><b>WASD</b> — move / drive</span><span><b>Shift</b> — sprint</span>
+    <span><b>Space</b> — jump / handbrake</span><span><b>E</b> — enter / exit car</span>
+    <span><b>F</b> — punch</span><span><b>Click</b> — shoot pistol</span>
+    <span><b>Drag mouse</b> — orbit camera</span><span><b>M</b> — mission menu</span>
+    <span><b>Esc</b> — pause</span><span><b>P</b> — mute</span>
+  </div>
+  <button id="btn-start">▶ START NEW GAME</button>
+  <button id="btn-continue" class="ghost">Continue saved game</button>
+</div>
+
+<div class="screen" id="screen-pause">
+  <h2>PAUSED</h2>
+  <p>Take a breath, Rook. Solmar Bay waits.</p>
+  <button id="btn-resume">Resume</button>
+  <button id="btn-restart" class="ghost">Restart current mission</button>
+</div>
+
+<div class="screen" id="screen-busted">
+  <h2>BUSTED</h2>
+  <p>The Solmar Bay PD caught up with you.</p>
+  <p id="busted-loss"></p>
+  <button id="btn-busted-ok">Walk free</button>
+</div>
+
+<div class="screen" id="screen-wasted">
+  <h2>WASTED</h2>
+  <p>You went down in Solmar Bay — but Rook always gets back up.</p>
+  <p id="wasted-loss"></p>
+  <button id="btn-wasted-ok">Wake up at the hospital</button>
+</div>
+
+<div class="screen" id="screen-missions">
+  <h2>MISSIONS</h2>
+  <p>Pick a mission to play. Progress saves automatically.</p>
+  <div id="mission-list"></div>
+  <button id="btn-mission-close" class="ghost">Close</button>
+</div>
+
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

@@ -1,13 +1,95 @@
-export const CITY = { extent: 260, spacing: 64, road: 18, beach: 218 };
-export const COLORS = { asphalt: 0x343e4b, sand: 0xe9c596, ocean: 0x258e9e, neon: 0x7fffd4 };
-export const RULES = { walk: 7, sprint: 13, acceleration: 19, maxSpeed: 42, reverse: 12, policeSight: 85, forget: 14 };
-export const MISSIONS = [
-  { name: 'First Wheels', intro: 'Mara: Welcome home, Rook. Borrow some wheels. Meet me at the pier.', reward: 450, target: [0, 208] },
-  { name: 'The Package', intro: 'Mara: A sealed case. No questions. Collect it downtown, then bring it to the beach.', reward: 800, target: [-128, 0] },
-  { name: 'Lose the Tail', intro: 'Detective Vale has your plate. Shake the patrols. Stay away from their sightlines.', reward: 1100, target: [128, 128] },
-  { name: 'Rooftop Deal', intro: 'Mara: Meet my contact on the parking terrace. The Cinder crew may arrive first.', reward: 1600, target: [128, -128] },
-  { name: 'The Big Score', intro: 'One last run. Take the armoured van from the north docks and disappear.', reward: 3000, target: [0, -192] }
-];
-export const HELP = 'WASD move / drive · Shift sprint · Space jump / handbrake · E enter / exit · F punch · Click shoot · Drag orbit · M missions · Esc pause · P sound';
-export const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-export const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+// Solmar Bay — central tuning table. Every number the rest of the game
+// reads lives here so a balance pass touches one file only.
+export const CFG = {
+  world: {
+    seed: 1337,
+    blocks: 5,            // city blocks per side
+    blockSize: 64,        // metres per block (road + plots)
+    roadWidth: 12,
+    sidewalkWidth: 3,
+    beachZ: 210,          // south edge: sand starts here
+    oceanZ: 260,
+    pierX: 0,
+    pierZ: 236,
+    maxBuildingHeight: 46,
+    minBuildingHeight: 9,
+  },
+  player: {
+    walkSpeed: 6,
+    sprintSpeed: 10.5,
+    jumpSpeed: 8.5,
+    gravity: 24,
+    radius: 0.55,
+    health: 100,
+    regenPerSec: 2.5,
+    regenDelaySec: 6,
+    startCash: 120,
+  },
+  car: {
+    accel: 22,
+    brake: 34,
+    reverseAccel: 12,
+    maxSpeed: 38,         // m/s, sports car
+    maxReverse: 10,
+    steerMax: 0.55,
+    steerSpeed: 2.4,
+    grip: 8,
+    handbrakeGrip: 2.2,
+    enterRange: 3.2,
+    health: 100,
+    smokeBelow: 35,
+  },
+  wanted: {
+    decayPerSec: 0.06,   // stars lost per second while unseen
+    decayDelaySec: 8,
+    sightRange: 55,
+    stealHeat: 1,
+    assaultHeat: 1,
+    killHeat: 2,
+    maxStars: 5,
+    cruiserAt: 2,
+    copFootSpeed: 7.2,
+    arrestRange: 1.6,
+    bustCashLoss: 0.15,
+  },
+  combat: {
+    punchDamage: 12,
+    punchRange: 2.1,
+    pistolDamage: 34,
+    pistolRange: 90,
+    pistolMag: 12,
+    pistolReserve: 48,
+    enemyDamage: 7,
+    enemyRange: 55,
+    medkitHeal: 50,
+  },
+  traffic: {
+    cars: 16,
+    carSpeed: 9,
+    carSpeedVar: 3.5,
+    pedestrians: 22,
+    pedSpeed: 1.6,
+    pedFleeSpeed: 4.2,
+  },
+  missions: [
+    { id: 0, name: "First Wheels", reward: 250, blurb: "Steal a car and drive it to the marker." },
+    { id: 1, name: "The Package", reward: 400, blurb: "Collect the package, then deliver it while the cops are watching." },
+    { id: 2, name: "Lose the Tail", reward: 500, blurb: "Shake a 2-star wanted level. Stay out of sight." },
+    { id: 3, name: "Rooftop Deal", reward: 800, blurb: "Meet the contact. Rival gang ambush — survive the shootout." },
+    { id: 4, name: "The Big Score", reward: 1500, blurb: "Steal the armoured van and escape a 3-star wanted level." },
+  ],
+  keys: {
+    up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD",
+    sprint: "ShiftLeft", jump: "Space", handbrake: "Space",
+    enter: "KeyE", punch: "KeyF", missions: "KeyM",
+    pause: "Escape", mute: "KeyP", restart: "KeyR",
+  },
+  palette: {
+    skyTop: 0x2e4a7a, skyBottom: 0xffb36b,
+    sun: 0xffd9a0, fog: 0xe8a06a,
+    asphalt: 0x2b2e33, sidewalk: 0x8d8578, sand: 0xe0c184,
+    ocean: 0x1d6f8e, grass: 0x4d7a3a,
+    building: [0x9a7f6a, 0x7d8aa0, 0xb08d6b, 0x6e7f7a, 0xa89a8a, 0x8a6f7d],
+  },
+  saveKey: "solmar-bay-save-v3",
+};

@@ -1,1 +1,1 @@
-{"description":"An original offline coastal crime game; no build step or dependencies to install.","name":"solmar-bay","private":true,"type":"module"}
+{"description":"Solmar Bay — open-world crime game for the make.fun gta6-01 bounty","engines":{"node":">=22"},"license":"MIT","name":"gta6-01","scripts":{"start":"node serve.ts"},"type":"module","version":"3.0.0"}

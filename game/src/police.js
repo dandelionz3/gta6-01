@@ -1,108 +1,160 @@
-import * as THREE from 'three';
-import { person, animatePerson } from './world.js';
-import { clamp, distance, RULES } from './config.js';
-export function createPolice(game) {
-  const cops = [], cruisers = [];
-  let spawnClock = 0, arrest = 0, hidden = 0;
-  function clearSight(a, b) {
-    const length = distance(a, b), steps = Math.ceil(length / 5);
-    for (let i = 1; i < steps; i++) {
-      const t = i / steps;
-      if (game.world.blocked(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, 0)) return false;
-    }
-    return true;
+// Wanted system: 0–5 stars. Heat rises when police see a crime, decays
+// when Rook stays out of sight. Foot cops chase and arrest; cruisers spawn
+// at 2+ stars and ram the player's car. BUSTED / WASTED are decided here.
+import * as THREE from "three";
+import { CFG } from "./config.js";
+import { RNG } from "./random.js";
+import { Car } from "./vehicles.js";
+
+function copMesh() {
+  const g = new THREE.Group();
+  const navy = new THREE.MeshStandardMaterial({ color: 0x1a2a4a, roughness: 0.85 });
+  const skin = new THREE.MeshStandardMaterial({ color: 0xd8a878, roughness: 0.8 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.05, 0.38), navy);
+  body.position.y = 1.3; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 10), skin);
+  head.position.y = 2.02; g.add(head);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.14, 10), navy);
+  cap.position.y = 2.2; g.add(cap);
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.8, 0.32), navy);
+  legs.position.y = 0.4; g.add(legs);
+  return g;
+}
+
+export class Police {
+  constructor(scene, world) {
+    this.scene = scene;
+    this.world = world;
+    this.rng = new RNG(31337);
+    this.stars = 0;          // float, displayed rounded up
+    this.unseenTimer = 0;
+    this.cops = [];          // foot cops {mesh,x,z,heading}
+    this.cruisers = [];      // Car instances
+    this.spawnTimer = 0;
+    this.flashTimer = 0;
   }
-  function witness() {
-    return cops.some(c => c.health > 0 && distance(c, game.player) < 65 && clearSight(c, game.player)) || cruisers.some(c => distance(c, game.player) < 75 && clearSight(c, game.player));
+
+  get level() { return Math.min(CFG.wanted.maxStars, Math.ceil(this.stars)); }
+
+  addHeat(n) {
+    this.stars = Math.min(CFG.wanted.maxStars, this.stars + n);
+    this.unseenTimer = 0;
   }
-  function addCop(x, z) {
-    const mesh = person(0x344e79, true); mesh.position.set(x, 0, z); game.scene.add(mesh);
-    const cop = { x, z, mesh, health: 70, cooldown: 1 }; cops.push(cop); return cop;
+  setStars(n) { this.stars = Math.max(0, Math.min(CFG.wanted.maxStars, n)); this.unseenTimer = 0; }
+
+  // Place a foot cop at exact coordinates (used by staged shots).
+  placeCop(x, z) {
+    const m = copMesh();
+    m.position.set(x, 0, z);
+    this.scene.add(m);
+    const cop = { mesh: m, x, z, heading: 0 };
+    this.cops.push(cop);
+    return cop;
   }
-  function addCruiser(x, z, angle = 0) {
-    const c = game.vehicles.spawn('police', x, z, angle, 0x24334a, 'police'); cruisers.push(c); return c;
+
+  _spawnCopNear(x, z) {
+    const m = copMesh();
+    const a = this.rng.range(0, Math.PI * 2);
+    const px = x + Math.sin(a) * 26, pz = z + Math.cos(a) * 26;
+    m.position.set(px, 0, pz);
+    this.scene.add(m);
+    this.cops.push({ mesh: m, x: px, z: pz, heading: a });
   }
-  // Visible patrols make a witnessed theft possible before the first pursuit.
-  addCop(-11, 18); addCop(75, -64); addCop(-117, 128);
-  function crime(amount) {
-    if (game.mode !== 'play') return;
-    game.wanted = clamp(game.wanted + amount, 0, 5); hidden = 0;
-    game.lastCrime = game.time;
-    game.traffic?.frighten();
+
+  _spawnCruiserNear(x, z) {
+    const a = this.rng.range(0, Math.PI * 2);
+    const car = new Car(this.scene, "police", x + Math.sin(a) * 34, z + Math.cos(a) * 34, a);
+    this.cruisers.push(car);
   }
-  function chaseCar(c, dt) {
-    if (c.health <= 0) { c.speed *= 0.95; return; }
-    const target = game.player;
-    const desired = Math.atan2(target.x - c.x, target.z - c.z);
-    let delta = Math.atan2(Math.sin(desired - c.angle), Math.cos(desired - c.angle));
-    c.angle += clamp(delta, -dt * 1.5, dt * 1.5);
-    const d = distance(c, target);
-    c.speed += ((d < 6 ? 7 : 22 + game.wanted * 2) - c.speed) * dt;
-    const nx = c.x + Math.sin(c.angle) * c.speed * dt;
-    const nz = c.z + Math.cos(c.angle) * c.speed * dt;
-    if (!game.world.blocked(nx, nz, 1.3)) { c.x = nx; c.z = nz; }
-    else {
-      c.speed = -5; c.angle += dt * 2.5;
-      // Route around rectangular blocks by selecting the closest road junction.
-      const roadX = Math.round(c.x / 64) * 64, roadZ = Math.round(c.z / 64) * 64;
-      const roadAngle = Math.atan2(roadX - c.x, roadZ - c.z);
-      c.angle = roadAngle;
-    }
-    if (d < 4.8 && game.car) {
-      game.car.health -= dt * (8 + game.wanted * 2); game.damage(dt * 2);
-      game.car.speed *= Math.pow(0.55, dt);
-    }
+
+  _clearUnits() {
+    for (const c of this.cops) this.scene.remove(c.mesh);
+    for (const c of this.cruisers) c.destroy();
+    this.cops = [];
+    this.cruisers = [];
   }
-  function update(dt) {
-    spawnClock -= dt;
-    if (game.wanted >= 1 && spawnClock <= 0) {
-      spawnClock = 5;
-      const a = game.rng() * Math.PI * 2;
-      let x = game.player.x + Math.sin(a) * 75, z = game.player.z + Math.cos(a) * 75;
-      x = clamp(Math.round(x / 64) * 64 + 4, -196, 196);
-      z = clamp(z, -205, 205);
-      if (game.world.blocked(x, z, 2)) z = Math.round(z / 64) * 64;
-      const active = cops.filter(c => c.health > 0);
-      if (active.length < 4 + Math.ceil(game.wanted)) addCop(x + 7, z);
-      if (game.wanted >= 2 && cruisers.length < Math.ceil(game.wanted) + 2) addCruiser(x, z);
-      else if (cruisers.length) {
-        const far = cruisers.find(c => distance(c, game.player) > 180);
-        if (far) { far.x = x; far.z = z; far.health = 100; }
-      }
-    }
-    const pursuing = game.wanted > 0;
+
+  // ctx: { playerPos, inCar, playerCar, dt, onBusted, onWasted, time, staging }
+  update(dt, ctx) {
+    const { playerPos } = ctx;
+    // Staged screenshot: hold every unit exactly where the shot put it.
+    if (ctx.staging) return;
+    const lvl = this.level;
+    this.flashTimer += dt;
+
+    // Wanted decays only while no police unit can see the player.
     let seen = false;
-    for (const c of cops) {
-      if (c.health <= 0) { c.mesh.rotation.z = Math.PI / 2; c.mesh.position.y = 0.2; continue; }
-      const d = distance(c, game.player);
-      const sight = d < RULES.policeSight && clearSight(c, game.player);
-      if (pursuing && sight) seen = true;
-      if (pursuing && d < 180) {
-        const angle = Math.atan2(game.player.x - c.x, game.player.z - c.z);
-        const speed = game.car ? 4.8 : 5.8;
-        const nx = c.x + Math.sin(angle) * speed * dt, nz = c.z + Math.cos(angle) * speed * dt;
-        if (!game.world.blocked(nx, c.z)) c.x = nx;
-        if (!game.world.blocked(c.x, nz)) c.z = nz;
-        c.mesh.rotation.y = angle; animatePerson(c.mesh, game.time, 1);
-        if (d < 1.65 && !game.car) arrest += dt;
-        c.cooldown -= dt;
-        if (game.wanted >= 3 && d < 35 && sight && c.cooldown <= 0) {
-          c.cooldown = 1.4; game.combat.enemyFire(c, 5);
-        }
-      }
-      c.mesh.position.x = c.x; c.mesh.position.z = c.z;
+    for (const c of this.cops) {
+      if (Math.hypot(c.x - playerPos.x, c.z - playerPos.z) < CFG.wanted.sightRange) { seen = true; break; }
     }
-    for (const c of cruisers) if (pursuing) {
-      chaseCar(c, dt);
-      if (distance(c, game.player) < 95 && clearSight(c, game.player)) seen = true;
-    } else c.speed *= Math.pow(0.2, dt);
-    if (!cops.some(c => c.health > 0 && distance(c, game.player) < 1.65) || game.car) arrest = Math.max(0, arrest - dt * 2);
-    if (arrest > 2.2 && !game.god) game.end('busted');
-    if (pursuing) {
-      hidden = seen ? 0 : hidden + dt;
-      if (hidden > RULES.forget) { game.wanted = Math.max(0, Math.ceil(game.wanted) - 1); hidden = 0; if (!game.wanted) game.toast('Pursuit lost. Keep a low profile.'); }
-    } else hidden = 0;
-    game.policeSeen = seen; game.escapeProgress = hidden / RULES.forget; game.arrestProgress = arrest / 2.2;
+    if (!seen) {
+      for (const c of this.cruisers) {
+        if (Math.hypot(c.pos.x - playerPos.x, c.pos.z - playerPos.z) < CFG.wanted.sightRange) { seen = true; break; }
+      }
+    }
+    if (lvl > 0 && !seen) {
+      this.unseenTimer += dt;
+      if (this.unseenTimer > CFG.wanted.decayDelaySec) {
+        this.stars = Math.max(0, this.stars - CFG.wanted.decayPerSec * dt);
+        if (this.stars < 0.05) { this.stars = 0; this._clearUnits(); }
+      }
+    } else {
+      this.unseenTimer = 0;
+    }
+
+    // Keep unit counts matched to the wanted level.
+    const wantCops = lvl >= 1 ? Math.min(4, lvl + 1) : 0;
+    const wantCruisers = lvl >= CFG.wanted.cruiserAt ? Math.min(4, lvl - 1) : 0;
+    this.spawnTimer -= dt;
+    if (this.spawnTimer <= 0) {
+      this.spawnTimer = 1.2;
+      if (this.cops.length < wantCops) this._spawnCopNear(playerPos.x, playerPos.z);
+      if (this.cruisers.length < wantCruisers) this._spawnCruiserNear(playerPos.x, playerPos.z);
+    }
+    if (lvl === 0) {
+      // stragglers walk off
+      for (const c of this.cops) {
+        c.heading += 0.01;
+        c.x += Math.sin(c.heading) * 1.2 * dt;
+        c.z += Math.cos(c.heading) * 1.2 * dt;
+        c.mesh.position.set(c.x, 0, c.z);
+        c.mesh.rotation.y = c.heading;
+      }
+      return;
+    }
+
+    // Foot cops run at the player; touch = BUSTED.
+    for (const c of this.cops) {
+      const dx = playerPos.x - c.x, dz = playerPos.z - c.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.01) {
+        c.heading = Math.atan2(dx, dz);
+        const sp = CFG.wanted.copFootSpeed * (ctx.inCar ? 0.85 : 1);
+        c.x += Math.sin(c.heading) * sp * dt;
+        c.z += Math.cos(c.heading) * sp * dt;
+      }
+      c.mesh.position.set(c.x, 0, c.z);
+      c.mesh.rotation.y = c.heading;
+      if (d < CFG.wanted.arrestRange && !ctx.inCar) ctx.onBusted();
+    }
+
+    // Cruisers chase the player's car (or the player on foot) and ram.
+    for (const cr of this.cruisers) {
+      const dx = playerPos.x - cr.pos.x, dz = playerPos.z - cr.pos.z;
+      const d = Math.hypot(dx, dz);
+      const wantHeading = Math.atan2(dx, dz);
+      let dh = wantHeading - cr.heading;
+      while (dh > Math.PI) dh -= Math.PI * 2;
+      while (dh < -Math.PI) dh += Math.PI * 2;
+      const steer = Math.max(-1, Math.min(1, dh * 1.6));
+      const throttle = d > 6 ? 1 : 0.4;
+      cr.drive(dt, { throttle, steer, brake: false, handbrake: false }, this.world.colliders);
+      // ram damage when contact is made with the player's car
+      if (ctx.inCar && ctx.playerCar && d < 3.4) {
+        ctx.playerCar.health -= 6 * dt;
+        cr.speed *= 0.6;
+        if (ctx.playerCar.health <= 0) ctx.onWasted();
+      }
+    }
   }
-  return { cops, cruisers, update, crime, witness, clearSight, addCop, addCruiser, reset() { arrest = 0; hidden = 0; for (const c of cruisers) { c.x = -192; c.z = -192; } } };
 }
