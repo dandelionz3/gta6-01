@@ -1,99 +1,95 @@
-// Keyboard + mouse state. Drag orbits the camera, click shoots (when armed).
-
-import { KEYS } from "./config.js";
-
+// Keyboard + mouse state for Solmar Bay. Pointer drag orbits the camera,
+// a short click (not a drag) fires the pistol. Keys are read per-frame and
+// "just pressed" edges are consumed by the game loop.
 export class Input {
-  constructor(canvas) {
+  constructor(el) {
+    this.el = el;
     this.keys = new Set();
-    this.mouseDown = false;
-    this.mouseClicked = false; // consumed by combat each frame
-    this.dragDX = 0;
-    this.dragDY = 0;
-    this._dragging = false;
-    this._lastX = 0;
-    this._lastY = 0;
-    this._pressed = new Set(); // edge-triggered keys, consumed per frame
-    this.canvas = canvas;
-    this._onKeyDown = (e) => {
+    this.pressed = new Set(); // edges since last endFrame()
+    this.dragX = 0;
+    this.dragY = 0;
+    this.clicked = false;
+    this.dragging = false;
+    this.downX = 0;
+    this.downY = 0;
+    this.moved = 0;
+
+    this.onKeyDown = (e) => {
       if (e.repeat) return;
+      if (!this.keys.has(e.code)) this.pressed.add(e.code);
       this.keys.add(e.code);
-      this._pressed.add(e.code);
-      if (e.code === KEYS.jump) e.preventDefault();
+      // keep the page from scrolling / jumping while playing
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        e.preventDefault();
+      }
     };
-    this._onKeyUp = (e) => this.keys.delete(e.code);
-    this._onMouseDown = (e) => {
-      this.mouseDown = true;
-      this.mouseClicked = true;
-      this._dragging = true;
-      this._lastX = e.clientX;
-      this._lastY = e.clientY;
-    };
-    this._onMouseUp = () => {
-      this.mouseDown = false;
-      this._dragging = false;
-    };
-    this._onMouseMove = (e) => {
-      if (!this._dragging) return;
-      this.dragDX += e.clientX - this._lastX;
-      this.dragDY += e.clientY - this._lastY;
-      this._lastX = e.clientX;
-      this._lastY = e.clientY;
-    };
-    this._onBlur = () => {
+    this.onKeyUp = (e) => this.keys.delete(e.code);
+    this.onBlur = () => {
       this.keys.clear();
-      this.mouseDown = false;
-      this._dragging = false;
+      this.dragging = false;
     };
-    window.addEventListener("keydown", this._onKeyDown);
-    window.addEventListener("keyup", this._onKeyUp);
-    canvas.addEventListener("mousedown", this._onMouseDown);
-    window.addEventListener("mouseup", this._onMouseUp);
-    window.addEventListener("mousemove", this._onMouseMove);
-    window.addEventListener("blur", this._onBlur);
+    this.onPointerDown = (e) => {
+      this.dragging = true;
+      this.moved = 0;
+      this.downX = e.clientX;
+      this.downY = e.clientY;
+    };
+    this.onPointerMove = (e) => {
+      if (!this.dragging) return;
+      this.dragX += e.movementX || 0;
+      this.dragY += e.movementY || 0;
+      this.moved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
+    };
+    this.onPointerUp = (e) => {
+      if (this.dragging && this.moved < 6) this.clicked = true;
+      this.dragging = false;
+    };
+
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('blur', this.onBlur);
+    el.addEventListener('pointerdown', this.onPointerDown);
+    window.addEventListener('pointermove', this.onPointerMove);
+    window.addEventListener('pointerup', this.onPointerUp);
   }
 
   down(code) {
     return this.keys.has(code);
   }
-
-  // True once, on the frame the key went down.
-  pressed(code) {
-    return this._pressed.has(code);
+  // true once for the frame the key went down
+  justPressed(code) {
+    return this.pressed.has(code);
   }
-
-  axis() {
-    let x = 0;
-    let z = 0;
-    if (this.down(KEYS.forward)) z -= 1;
-    if (this.down(KEYS.back)) z += 1;
-    if (this.down(KEYS.left)) x -= 1;
-    if (this.down(KEYS.right)) x += 1;
-    return { x, z };
-  }
-
-  takeDrag() {
-    const d = { dx: this.dragDX, dy: this.dragDY };
-    this.dragDX = 0;
-    this.dragDY = 0;
-    return d;
-  }
-
-  takeClick() {
-    const c = this.mouseClicked;
-    this.mouseClicked = false;
+  consumeClick() {
+    const c = this.clicked;
+    this.clicked = false;
     return c;
   }
-
-  endFrame() {
-    this._pressed.clear();
+  consumeDrag() {
+    const d = { x: this.dragX, y: this.dragY };
+    this.dragX = 0;
+    this.dragY = 0;
+    return d;
   }
-
+  // WASD / arrows as a -1..1 pair
+  moveAxes() {
+    let x = 0;
+    let z = 0;
+    if (this.down('KeyW') || this.down('ArrowUp')) z -= 1;
+    if (this.down('KeyS') || this.down('ArrowDown')) z += 1;
+    if (this.down('KeyA') || this.down('ArrowLeft')) x -= 1;
+    if (this.down('KeyD') || this.down('ArrowRight')) x += 1;
+    return { x, z };
+  }
+  endFrame() {
+    this.pressed.clear();
+  }
   dispose() {
-    window.removeEventListener("keydown", this._onKeyDown);
-    window.removeEventListener("keyup", this._onKeyUp);
-    this.canvas.removeEventListener("mousedown", this._onMouseDown);
-    window.removeEventListener("mouseup", this._onMouseUp);
-    window.removeEventListener("mousemove", this._onMouseMove);
-    window.removeEventListener("blur", this._onBlur);
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onBlur);
+    this.el.removeEventListener('pointerdown', this.onPointerDown);
+    window.removeEventListener('pointermove', this.onPointerMove);
+    window.removeEventListener('pointerup', this.onPointerUp);
   }
 }

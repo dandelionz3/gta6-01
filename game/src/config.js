@@ -1,115 +1,143 @@
-// Solmar Bay — shared constants for the whole game.
-// Everything tunable lives here so a single edit retunes the game.
+// Solmar Bay — central tuning. Every number the rest of the game reads lives
+// here so balancing never means hunting through modules.
+export const CFG = {
+  title: 'Solmar Bay',
+  playerName: 'Rook',
+  saveKey: 'solmar-bay-save-v1',
 
-export const COLORS = {
-  skyTop: 0x2e5f8a,
-  skyBottom: 0xffb36b,
-  sun: 0xffd9a0,
-  fog: 0xe8a56b,
-  asphalt: 0x2b2b30,
-  sidewalk: 0x8d8578,
-  sand: 0xe0c184,
-  sea: 0x1d6f8e,
-  pierWood: 0x7a5230,
-  grass: 0x4d7a3a,
-  buildingPalette: [0x9a7b5f, 0x7f8ea3, 0xb08d6a, 0x6f7f6a, 0xa89a8a, 0x8a6f7d, 0x5f7480],
-  windowLit: 0xffd27a,
-  windowDark: 0x2a3542,
-  palmTrunk: 0x6b4a2a,
-  palmLeaf: 0x3f8f3f,
-  lampPost: 0x333338,
-  playerJacket: 0x2e6fb0,
-  playerPants: 0x22242a,
-  copUniform: 0x1c2f57,
-  gangJacket: 0x8a1f2d,
-  beacon: 0xffc233,
-  markerGreen: 0x37d67a,
+  world: {
+    half: 210, // playable city radius in metres (square, -half..half)
+    block: 46, // distance between road centrelines
+    road: 12, // road width
+    beachZ: 228, // sand starts here (south edge)
+    seaZ: 252, // water plane starts here
+    pierX: 60, // pier centre x
+    pierZ: 262, // pier extends south into the sea
+  },
+
+  // road centrelines are at multiples of block, from -4*block to +4*block
+  gridLines() {
+    const out = [];
+    for (let i = -4; i <= 4; i++) out.push(i * this.world.block);
+    return out;
+  },
+
+  colours: {
+    skyTop: 0x274b8f,
+    skyMid: 0xff9e5e,
+    skyLow: 0xffd9a0,
+    sun: 0xffc27a,
+    ground: 0x8a8f96,
+    asphalt: 0x2e3138,
+    sidewalk: 0x9aa0a8,
+    sand: 0xe8cf9a,
+    sea: 0x1e6f8e,
+    seaDeep: 0x14506b,
+  },
+
+  player: {
+    walk: 6,
+    sprint: 10.5,
+    accel: 40,
+    jump: 8,
+    gravity: 24,
+    radius: 0.6,
+    maxHealth: 100,
+    regenDelay: 6, // seconds after last damage before slow regen
+    regenRate: 4, // hp per second
+    startCash: 250,
+  },
+
+  car: {
+    accel: 17,
+    brake: 34,
+    reverseAccel: 10,
+    drag: 0.35, // per-second speed decay factor while coasting
+    steerRate: 1.9, // radians per second at full lock, scaled by speed
+    maxSpeed: { sedan: 27, sports: 39, taxi: 26, van: 21, police: 35, armored: 23 },
+    enterRange: 3.6,
+    wreckSmokeBelow: 35,
+  },
+
+  traffic: {
+    cars: 14,
+    peds: 20,
+    cruiseMin: 8,
+    cruiseMax: 13,
+    brakeGap: 7,
+  },
+
+  wanted: {
+    max: 5,
+    decayDelay: 9, // seconds fully unseen before a star drops
+    stealInSight: 1,
+    assault: 1,
+    pedDown: 1,
+    copKill: 2,
+    arrestRange: 1.5,
+    arrestTime: 1.4,
+    sightRange: 46,
+  },
+
+  combat: {
+    pistolAmmoStart: 24,
+    pistolAmmoMax: 60,
+    pistolDamage: 34,
+    pistolRange: 70,
+    punchDamage: 18,
+    punchRange: 2.1,
+    punchArc: 1.1, // radians of frontal cone
+    enemyHp: 60,
+    enemyDamage: 9,
+    enemyShotGap: 1.6,
+  },
+
+  missions: [
+    {
+      id: 1, title: 'First Wheels', reward: 400,
+      objective: 'Steal a car, then drive to the marker',
+      steps: [
+        { kind: 'steal', text: 'Steal any car (press E near one)' },
+        { kind: 'goto', pos: [92, 46], text: 'Drive to the marker' },
+      ],
+    },
+    {
+      id: 2, title: 'The Package', reward: 700,
+      objective: 'Collect the package and deliver it — the law is watching',
+      steps: [
+        { kind: 'goto', pos: [-46, 92], text: 'Pick up the package' },
+        { kind: 'deliver', pos: [138, -92], text: 'Deliver the package' },
+      ],
+    },
+    {
+      id: 3, title: 'Lose the Tail', reward: 900,
+      objective: 'Shake a 2-star wanted level',
+      steps: [
+        { kind: 'heat', stars: 2, text: 'The cops are on you — run' },
+        { kind: 'clear', text: 'Lose the wanted level' },
+      ],
+    },
+    {
+      id: 4, title: 'Rooftop Deal', reward: 1400,
+      objective: 'Meet the contact, survive the ambush',
+      steps: [
+        { kind: 'goto', pos: [-92, -46], text: 'Meet the contact on the roof street' },
+        { kind: 'survive', count: 4, text: 'Survive the ambush — take them all down' },
+      ],
+    },
+    {
+      id: 5, title: 'The Big Score', reward: 2500,
+      objective: 'Steal the armoured van and escape a 3-star wanted level',
+      steps: [
+        { kind: 'goto', pos: [0, 138], text: 'Reach the armoured van' },
+        { kind: 'escape', pos: [-184, 184], text: 'Drive the van to the hideout' },
+      ],
+    },
+  ],
+
+  keys: {
+    forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
+    sprint: 'ShiftLeft', jump: 'Space', enter: 'KeyE', punch: 'KeyF',
+    missions: 'KeyM', pause: 'Escape', mute: 'KeyP',
+  },
 };
-
-export const WORLD = {
-  blockSize: 42,
-  roadWidth: 14,
-  gridHalf: 4, // avenues/streets from -4..4
-  cityHalf: 210,
-  beachZ: 196,
-  seaZ: 232,
-  sidewalkWidth: 4,
-};
-
-export const PLAYER = {
-  walkSpeed: 6.5,
-  sprintSpeed: 10.5,
-  jumpSpeed: 8.5,
-  radius: 0.55,
-  height: 1.8,
-  maxHealth: 100,
-  regenPerSec: 2.5,
-  regenDelaySec: 6,
-  startCash: 120,
-};
-
-export const CAR = {
-  accel: 22,
-  brake: 34,
-  reverseAccel: 12,
-  maxSpeed: 38,
-  maxReverse: 12,
-  steerAngle: 0.55,
-  grip: 6.5,
-  enterDistance: 3.2,
-  wreckHealth: 0,
-  smokeBelow: 35,
-};
-
-export const WANTED = {
-  decaySeconds: 14,
-  decayDistance: 55,
-  starsMax: 5,
-  copFootSpeed: 7.2,
-  cruiserSpeed: 34,
-  bustDistance: 2.2,
-  bustTimeSec: 2.5,
-  finePerStar: 60,
-  hospitalSpawn: { x: -168, z: -168 },
-};
-
-export const COMBAT = {
-  punchRange: 2.1,
-  punchDamage: 18,
-  punchCooldown: 0.45,
-  pistolDamage: 34,
-  pistolRange: 90,
-  pistolCooldown: 0.28,
-  pistolMag: 12,
-  pistolReserveStart: 48,
-  enemyDamage: 9,
-  enemyRange: 55,
-  enemyCooldown: 1.1,
-};
-
-export const MISSIONS = [
-  { id: 1, name: "First Wheels", brief: "Steal a car and drive to the marker.", reward: 250 },
-  { id: 2, name: "The Package", brief: "Collect the package, then deliver it while the heat is on.", reward: 450 },
-  { id: 3, name: "Lose the Tail", brief: "Shake a 2-star wanted level. Stay out of sight.", reward: 600 },
-  { id: 4, name: "Rooftop Deal", brief: "Meet the contact. Rival crew ambush — survive the shootout.", reward: 900 },
-  { id: 5, name: "The Big Score", brief: "Steal the armoured van and escape a 3-star wanted level.", reward: 1500 },
-];
-
-export const KEYS = {
-  forward: "KeyW",
-  back: "KeyS",
-  left: "KeyA",
-  right: "KeyD",
-  sprint: "ShiftLeft",
-  jump: "Space",
-  handbrake: "Space",
-  enterCar: "KeyE",
-  punch: "KeyF",
-  missionMenu: "KeyM",
-  pause: "Escape",
-  mute: "KeyP",
-};
-
-export const SHOT_NAMES = ["cover", "drive", "mission", "chase"];
-
-export const SAVE_KEY = "solmar-bay-save-v1";

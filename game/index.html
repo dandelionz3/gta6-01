@@ -1,112 +1,146 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Solmar Bay — gta6-01</title>
 <style>
-  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #101014; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #fff; }
-  #game-canvas { display: block; width: 100vw; height: 100vh; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #10141a;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #f2f2f2; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   .hidden { display: none !important; }
-  #hud { position: fixed; inset: 0; pointer-events: none; }
-  #top-right { position: absolute; top: 14px; right: 16px; text-align: right; }
-  #wanted { font-size: 30px; letter-spacing: 4px; color: #888; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
-  #wanted.hot { color: #ffd233; }
-  #cash { font-size: 26px; font-weight: 700; color: #7ddb8a; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
-  #health-wrap { position: absolute; left: 16px; bottom: 16px; width: 240px; }
-  #health-label { font-size: 13px; opacity: .9; margin-bottom: 4px; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
-  #health-bar { height: 12px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.35); border-radius: 6px; overflow: hidden; }
-  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #37d67a, #7ddb8a); }
-  #speed { position: absolute; right: 16px; bottom: 16px; font-size: 30px; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
-  #ammo { position: absolute; right: 16px; bottom: 56px; font-size: 18px; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
-  #objective { position: absolute; top: 14px; left: 16px; max-width: 420px; font-size: 15px; background: rgba(0,0,0,.5); padding: 8px 12px; border-radius: 8px; border-left: 4px solid #ffc233; }
-  #banner { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 700; background: rgba(0,0,0,.6); padding: 10px 22px; border-radius: 10px; text-align: center; max-width: 80vw; }
-  #toasts { position: absolute; left: 16px; top: 110px; display: flex; flex-direction: column; gap: 6px; }
-  .toast { background: rgba(0,0,0,.55); padding: 6px 12px; border-radius: 8px; font-size: 14px; }
-  #minimap { position: absolute; left: 16px; top: 110px; width: 168px; height: 168px; border: 2px solid rgba(255,255,255,.5); border-radius: 50%; background: #20242a; }
-  #controls-hint { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 12px; opacity: .85; background: rgba(0,0,0,.5); padding: 5px 12px; border-radius: 8px; white-space: nowrap; }
-  #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; }
-  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff; }
-  #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
-  #crosshair::after { top: 8px; left: 0; width: 18px; height: 2px; }
-  #damage-vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(200,0,0,.55) 100%); }
-  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(8, 10, 18, .82); text-align: center; padding: 24px; }
-  .screen h1 { font-size: 52px; margin: 0 0 8px; letter-spacing: 2px; color: #ffc233; text-shadow: 0 4px 24px rgba(255, 178, 51, .4); }
-  .screen h2 { font-size: 40px; margin: 0 0 8px; }
-  .screen p { max-width: 560px; font-size: 16px; line-height: 1.5; opacity: .92; }
-  .screen button { pointer-events: auto; margin-top: 18px; font-size: 18px; font-weight: 700; padding: 12px 34px; border: none; border-radius: 10px; background: #ffc233; color: #1a1a1a; cursor: pointer; }
-  .screen button:hover { background: #ffd75e; }
-  .controls-table { margin-top: 14px; font-size: 14px; opacity: .9; line-height: 1.7; text-align: left; }
-  #mission-menu { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.6); pointer-events: auto; }
-  #mission-menu .panel { background: #16181f; border: 1px solid #444; border-radius: 12px; padding: 22px 26px; max-width: 520px; }
-  .mission-row { padding: 8px 4px; border-bottom: 1px solid #333; font-size: 14px; }
-  .mission-row.current { color: #ffc233; font-weight: 700; }
-  #mission-close { margin-top: 14px; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #top-left { position: absolute; top: 14px; left: 14px; }
+  #health-bar { width: 220px; height: 16px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: #3fce5a; transition: width 0.2s; }
+  #health-text { font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px #000; margin-top: 2px; }
+  #cash { margin-top: 8px; font-size: 26px; font-weight: 800; color: #7de08a; text-shadow: 0 2px 3px #000; }
+  #top-right { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #stars { font-size: 30px; letter-spacing: 4px; color: #ffd94a; text-shadow: 0 2px 4px #000; }
+  #stars.hot { color: #ff4a3a; animation: blink 0.7s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.55; } }
+  #minimap { margin-top: 8px; width: 168px; height: 168px; border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; background: rgba(16,22,30,0.8); }
+  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    max-width: 52%; text-align: center; font-size: 17px; font-weight: 700;
+    background: rgba(0,0,0,0.55); padding: 8px 16px; border-radius: 4px; text-shadow: 0 1px 2px #000; }
+  #toast { position: absolute; top: 84px; left: 50%; transform: translateX(-50%);
+    font-size: 18px; font-weight: 700; color: #ffe9a8; text-shadow: 0 2px 3px #000;
+    transition: opacity 0.4s; text-align: center; max-width: 70%; }
+  #bottom-right { position: absolute; right: 16px; bottom: 16px; text-align: right; }
+  #speed { display: none; font-size: 15px; font-weight: 700; text-shadow: 0 1px 2px #000; }
+  #speed-value { font-size: 42px; font-weight: 800; }
+  #ammo { display: none; font-size: 15px; font-weight: 700; margin-top: 4px; text-shadow: 0 1px 2px #000; }
+  #ammo-value { font-size: 26px; }
+  #hint { position: absolute; left: 14px; bottom: 14px; font-size: 12.5px; line-height: 1.55;
+    background: rgba(0,0,0,0.5); padding: 8px 10px; border-radius: 4px; text-shadow: 0 1px 2px #000; }
+  #crosshair { display: none; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+    margin: -11px 0 0 -11px; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff;
+    box-shadow: 0 0 3px #000; }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { top: 10px; left: 0; width: 22px; height: 2px; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    background: radial-gradient(ellipse at center, transparent 52%, rgba(200,0,0,0.55) 100%); z-index: 6; }
+
+  /* ---------- screens ---------- */
+  .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: linear-gradient(160deg, rgba(20,16,40,0.88), rgba(120,50,20,0.82)); padding: 20px; }
+  .screen h1 { font-size: 58px; font-weight: 900; letter-spacing: 3px; color: #ffd94a;
+    text-shadow: 0 4px 0 #7a2a12, 0 8px 24px rgba(0,0,0,0.6); }
+  .screen h2 { font-size: 34px; font-weight: 800; letter-spacing: 2px; margin-bottom: 10px; }
+  .screen p { max-width: 560px; font-size: 16px; line-height: 1.6; color: #e8e2d5; margin: 8px 0; }
+  .screen .sub { color: #ffb36b; font-weight: 700; letter-spacing: 1px; }
+  .btn { pointer-events: auto; cursor: pointer; margin-top: 18px; padding: 13px 34px; font-size: 18px;
+    font-weight: 800; letter-spacing: 1px; color: #1c1206; background: #ffd94a; border: none;
+    border-radius: 4px; box-shadow: 0 4px 0 #a87a12; }
+  .btn:hover { background: #ffe27a; }
+  .btn.ghost { background: transparent; color: #ffd94a; border: 2px solid #ffd94a; box-shadow: none; }
+  .controls { margin-top: 20px; font-size: 13.5px; line-height: 1.8; background: rgba(0,0,0,0.45);
+    padding: 12px 18px; border-radius: 6px; text-align: left; }
+  .controls b { color: #ffd94a; display: inline-block; min-width: 118px; }
+  #save-note { margin-top: 12px; color: #7de08a; font-weight: 700; }
+  #mission-list { margin-top: 14px; width: min(520px, 90vw); text-align: left; }
+  .mission-row { display: flex; gap: 10px; padding: 9px 12px; margin: 5px 0;
+    background: rgba(0,0,0,0.45); border-radius: 4px; font-size: 15px; }
+  .mission-row .m-state { color: #ffd94a; font-weight: 800; width: 20px; }
+  .mission-row .m-title { flex: 1; }
+  .mission-row .m-reward { color: #7de08a; font-weight: 700; }
+  #busted-text, #wasted-text { font-size: 18px; }
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three/three.module.min.js" } }
 </script>
 </head>
 <body>
-<canvas id="game-canvas"></canvas>
-<div id="damage-vignette"></div>
+<canvas id="game"></canvas>
+<div id="vignette"></div>
 
-<div id="hud" class="hidden">
-  <div id="objective">Press Start to play.</div>
-  <div id="top-right">
-    <div id="wanted">☆☆☆☆☆</div>
-    <div id="cash">$120</div>
-  </div>
-  <div id="banner" class="hidden"></div>
-  <div id="toasts"></div>
-  <canvas id="minimap" width="168" height="168"></canvas>
-  <div id="health-wrap">
-    <div id="health-label">Health <span id="health-num">100</span></div>
+<div id="hud">
+  <div id="top-left">
     <div id="health-bar"><div id="health-fill"></div></div>
+    <div id="health-text">100</div>
+    <div id="cash">$250</div>
   </div>
-  <div id="speed"></div>
-  <div id="ammo"></div>
-  <div id="crosshair" class="hidden"></div>
-  <div id="controls-hint">WASD move/drive · Shift sprint · Space jump/handbrake · E enter car · F punch · Q pistol · Click shoot · M missions · P mute · Esc pause</div>
+  <div id="top-right">
+    <div id="stars">☆☆☆☆☆</div>
+    <canvas id="minimap" width="168" height="168"></canvas>
+  </div>
+  <div id="objective">Welcome to Solmar Bay</div>
+  <div id="toast"></div>
+  <div id="bottom-right">
+    <div id="speed"><span id="speed-value">0</span> km/h</div>
+    <div id="ammo">PISTOL <span id="ammo-value">24</span></div>
+  </div>
+  <div id="hint">WASD move / drive &nbsp;·&nbsp; Shift sprint &nbsp;·&nbsp; Space jump / handbrake<br>
+    E enter car &nbsp;·&nbsp; F punch &nbsp;·&nbsp; Click shoot &nbsp;·&nbsp; Drag mouse orbit camera<br>
+    M missions &nbsp;·&nbsp; Esc pause &nbsp;·&nbsp; P mute</div>
+  <div id="crosshair"></div>
 </div>
 
-<div id="mission-menu" class="hidden">
-  <div class="panel">
-    <h2>Missions — Rook's Story</h2>
-    <div id="mission-list"></div>
-    <button id="mission-close">Close</button>
-  </div>
-</div>
-
-<div id="title-screen" class="screen">
+<div id="screen-title" class="screen">
   <h1>SOLMAR BAY</h1>
-  <p>Sun, sea, and trouble. You are Rook, a small-time driver drawn back into the
-  underworld of a coastal city. Steal cars, outrun the police, and run five story
-  missions to pull off the big score.</p>
-  <div class="controls-table">
-    WASD — move / drive &nbsp;·&nbsp; Shift — sprint &nbsp;·&nbsp; Space — jump / handbrake<br>
-    E — enter / exit car &nbsp;·&nbsp; F — punch &nbsp;·&nbsp; Q — draw pistol, click — shoot<br>
-    Mouse drag — orbit camera &nbsp;·&nbsp; M — missions &nbsp;·&nbsp; P — mute &nbsp;·&nbsp; Esc — pause
+  <p class="sub">An open-world crime game — drive, steal cars, outrun the law, run five story jobs.</p>
+  <p>You are <b>Rook</b>, a small-time driver drawn back into the city's underworld.
+     The sun is setting over the bay. The cops are already watching.</p>
+  <button class="btn" id="btn-start">START ENGINE</button>
+  <div id="save-note"></div>
+  <div class="controls">
+    <div><b>WASD</b> move / drive</div>
+    <div><b>Shift</b> sprint &nbsp; <b>Space</b> jump / handbrake</div>
+    <div><b>E</b> enter / exit car &nbsp; <b>F</b> punch &nbsp; <b>Click</b> shoot pistol</div>
+    <div><b>Mouse drag</b> orbit camera &nbsp; <b>M</b> missions &nbsp; <b>Esc</b> pause &nbsp; <b>P</b> mute</div>
   </div>
-  <button id="start-btn">Start</button>
 </div>
 
-<div id="pause-screen" class="screen hidden">
-  <h2>Paused</h2>
-  <p>Solmar Bay waits for no one — except right now.</p>
-  <button id="resume-btn">Resume</button>
+<div id="screen-pause" class="screen hidden">
+  <h2>PAUSED</h2>
+  <p>Take a breath, Rook. The city will wait.</p>
+  <button class="btn" id="btn-resume">RESUME</button>
+  <button class="btn ghost" id="btn-restart">RESTART GAME</button>
 </div>
 
-<div id="busted-screen" class="screen hidden">
+<div id="screen-busted" class="screen hidden">
   <h2>BUSTED</h2>
-  <p>The Solmar Bay PD caught up with you. You pay a fine and walk out of the hospital wing.</p>
-  <button id="restart-btn">Back on the streets</button>
+  <p id="busted-text"></p>
+  <button class="btn" id="btn-retry-busted">BACK ON THE STREET</button>
 </div>
 
-<div id="wasted-screen" class="screen hidden">
+<div id="screen-wasted" class="screen hidden">
   <h2>WASTED</h2>
-  <p>Rook went down. The city keeps moving — so do you, after a hospital visit.</p>
-  <button id="continue-btn">Back on the streets</button>
+  <p id="wasted-text"></p>
+  <button class="btn" id="btn-retry-wasted">BACK ON THE STREET</button>
+</div>
+
+<div id="screen-mission" class="screen hidden">
+  <h2>JOB BOARD</h2>
+  <p id="mission-title">Next job</p>
+  <div id="mission-list"></div>
+  <button class="btn" id="btn-start-mission">START CURRENT JOB</button>
+  <button class="btn ghost" id="btn-close-mission">CLOSE</button>
 </div>
 
 <script type="module" src="./src/main.js"></script>

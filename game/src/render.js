@@ -1,79 +1,70 @@
-// Three.js renderer + scene + late-afternoon lighting + sky + fog.
+// Renderer, scene, camera and late-afternoon lighting for Solmar Bay.
+import * as THREE from 'three';
+import { CFG } from './config.js';
 
-import * as THREE from "three";
-import { COLORS } from "./config.js";
+function skyTexture() {
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, '#274b8f');
+  grad.addColorStop(0.45, '#7a6aa8');
+  grad.addColorStop(0.7, '#ff9e5e');
+  grad.addColorStop(1, '#ffd9a0');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
-export function createRender(canvas) {
+export function createRenderer(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(COLORS.fog, 120, 520);
+  scene.fog = new THREE.Fog(0xe8a06a, 130, 460);
 
-  // Vertical gradient sky on a big backside sphere.
-  const skyGeo = new THREE.SphereGeometry(800, 24, 16);
-  const skyMat = new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    uniforms: {
-      top: { value: new THREE.Color(COLORS.skyTop) },
-      bottom: { value: new THREE.Color(COLORS.skyBottom) },
-    },
-    vertexShader: `
-      varying vec3 vPos;
-      void main() {
-        vPos = position;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }`,
-    fragmentShader: `
-      uniform vec3 top;
-      uniform vec3 bottom;
-      varying vec3 vPos;
-      void main() {
-        float h = clamp(normalize(vPos).y * 0.5 + 0.5, 0.0, 1.0);
-        gl_FragColor = vec4(mix(bottom, top, pow(h, 0.8)), 1.0);
-      }`,
-  });
-  const sky = new THREE.Mesh(skyGeo, skyMat);
+  // gradient sky dome
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(720, 24, 16),
+    new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false }),
+  );
   scene.add(sky);
 
-  // Low warm sun + soft sky fill.
-  const sun = new THREE.DirectionalLight(COLORS.sun, 2.4);
-  sun.position.set(-140, 110, 180);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.camera.left = -240;
-  sun.shadow.camera.right = 240;
-  sun.shadow.camera.top = 240;
-  sun.shadow.camera.bottom = -240;
-  sun.shadow.camera.far = 700;
-  scene.add(sun);
-  scene.add(new THREE.HemisphereLight(0x8fb4d8, 0x8a6a4a, 0.9));
-
   const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1600);
-  camera.position.set(0, 8, 14);
+  camera.position.set(0, 6, -14);
 
-  function onResize() {
+  const hemi = new THREE.HemisphereLight(0xffe0b8, 0x3a4a5a, 1.1);
+  scene.add(hemi);
+
+  const sun = new THREE.DirectionalLight(CFG.colours.sun, 2.1);
+  sun.position.set(-140, 150, 90);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -230;
+  sun.shadow.camera.right = 230;
+  sun.shadow.camera.top = 230;
+  sun.shadow.camera.bottom = -230;
+  sun.shadow.camera.far = 600;
+  sun.shadow.bias = -0.0004;
+  scene.add(sun);
+  scene.add(sun.target);
+
+  function resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
   }
-  window.addEventListener("resize", onResize);
+  window.addEventListener('resize', resize);
 
-  return { renderer, scene, camera, sun, onResize };
-}
-
-// Third-person follow camera with drag orbit + pitch clamp.
-export function updateCamera(camera, target, yaw, pitch, dist, dt) {
-  const px = target.x + Math.sin(yaw) * Math.cos(pitch) * dist;
-  const pz = target.z + Math.cos(yaw) * Math.cos(pitch) * dist;
-  const py = target.y + 2.2 + Math.sin(pitch) * dist;
-  const desired = new THREE.Vector3(px, Math.max(py, target.y + 1.2), pz);
-  camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
-  camera.lookAt(target.x, target.y + 1.6, target.z);
+  return { renderer, scene, camera, sun, hemi, sky, resize };
 }
